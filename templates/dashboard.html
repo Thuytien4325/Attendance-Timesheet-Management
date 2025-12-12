@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Dashboard</title></head>
+<body style="padding:20px; font-family:sans-serif;">
+    <h1>Xin chào, {{ name }}! <a href="/logout" style="font-size:15px; color:red;">[Đăng xuất]</a></h1>
+    
+    <form action="/checkin" method="POST">
+        <button style="padding:15px 30px; background:green; color:white; font-size:18px; border:none; cursor:pointer;">
+            ✅ CHẤM CÔNG NGAY
+        </button>
+    </form>
+
+    <h3>Lịch sử của bạn:</h3>
+    <table border="1" style="width:100%; border-collapse:collapse;">
+        <tr><th>Thời gian</th><th>Trạng thái</th></tr>
+        {% for row in data %}
+        <tr>
+            <td style="padding:8px;">{{ row.check_in_time }}</td>
+            <td style="padding:8px;">{{ row.status }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
