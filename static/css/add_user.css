@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+* { font-family: 'Poppins', sans-serif; }
+body { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; display: flex; justify-content: center; align-items: center; }
+.form-container { width: 100%; max-width: 600px; background: rgba(255, 255, 255, 0.98); border-radius: 25px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: slideUp 0.6s ease-out; position: relative; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+.form-header { text-align: center; margin-bottom: 35px; }
+.form-icon { width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 2.5rem; color: white; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.form-header h2 { font-weight: 700; color: #2c3e50; margin-bottom: 10px; }
+.form-header p { color: #7f8c8d; font-size: 0.95rem; margin: 0; }
+.form-label { font-weight: 600; color: #2c3e50; margin-bottom: 8px; font-size: 0.95rem; }
+.required { color: #e74c3c; margin-left: 3px; }
+.form-control, .form-select { border: 2px solid #e0e0e0; border-radius: 12px; padding: 12px 18px; font-size: 0.95rem; transition: all 0.3s; }
+.form-control:focus, .form-select:focus { border-color: #667eea; box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15); }
+.btn-submit { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; padding: 14px; font-size: 1.1rem; font-weight: 600; border-radius: 12px; width: 100%; transition: all 0.4s; box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3); }
+.btn-submit:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4); }
+.btn-cancel { background: #95a5a6; border: none; color: white; padding: 14px; font-size: 1rem; font-weight: 600; border-radius: 12px; width: 100%; transition: all 0.3s; text-decoration: none; display: block; text-align: center; }
+.btn-cancel:hover { background: #7f8c8d; transform: translateY(-2px); color: white; }
+.password-toggle { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #7f8c8d; transition: color 0.3s; z-index: 10; background: white; padding-left: 5px; }
+.password-toggle:hover { color: #667eea; }
+.password-wrapper { position: relative; }
+.form-section { margin-bottom: 25px; padding: 20px; background: #f8f9fa; border-radius: 15px; border: 1px solid #eee; }
+.form-section-title { font-weight: 600; color: #667eea; margin-bottom: 15px; font-size: 1rem; display: flex; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+.form-section-title i { margin-right: 8px; font-size: 1.2rem; }
+@media (max-width: 576px) { .form-container { padding: 20px; } .form-icon { width: 60px; height: 60px; font-size: 2rem; } .form-header h2 { font-size: 1.5rem; } }
