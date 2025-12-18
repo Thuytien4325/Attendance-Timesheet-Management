@@ -22,16 +22,16 @@
                 <nav class="mt-4">
                     <a href="{{ url_for('dashboard') }}" class="menu-item active"><i class="bi bi-house-door-fill"></i><span>Trang chủ</span></a>
                     <a href="#history" class="menu-item"><i class="bi bi-calendar-check"></i><span>Lịch sử</span></a>
+                    
                     {% if session.get('role') == 'admin' %}
                     <a href="{{ url_for('admin_users') }}" class="menu-item admin-only">
-                        <i class="bi bi-people-fill"></i>
-                        <span>Quản lý nhân viên</span>
+                        <i class="bi bi-people-fill"></i><span>Quản lý nhân viên</span>
+                    </a>
+                    <a href="{{ url_for('add_user') }}" class="menu-item admin-only">
+                        <i class="bi bi-gear-fill"></i><span>Quản trị hệ thống</span>
                     </a>
                     {% endif %}
-
-                    {% if session.get('role') == 'admin' %}
-                    <a href="{{ url_for('add_user') }}" class="menu-item admin-only"><i class="bi bi-gear-fill"></i><span>Quản trị hệ thống</span></a>
-                    {% endif %}
+                    
                     <a href="{{ url_for('logout') }}" class="menu-item" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1);"><i class="bi bi-box-arrow-right"></i><span>Đăng xuất</span></a>
                 </nav>
             </div>
@@ -75,13 +75,51 @@
                         <div class="checkin-section">
                             <div class="current-time text-muted mb-2" id="currentTime"><i class="fas fa-clock"></i> --:--:--</div>
                             <h4 class="mb-4 fw-bold" style="color: #667eea;">Chấm Công Hôm Nay</h4>
+                            
+                            {% if attendance_today %}
+                                <div class="alert alert-light border mb-3">
+                                    <strong>Trạng thái: </strong>
+                                    <span class="badge bg-{{ 'success' if attendance_today.status == 'on_time' else 'danger' if attendance_today.status == 'late' else 'warning' }}">
+                                        {{ 'Đúng giờ' if attendance_today.status == 'on_time' else 'Đi muộn' if attendance_today.status == 'late' else 'Về sớm' }}
+                                    </span>
+                                    <span class="ms-3">Vào: <strong>{{ attendance_today.check_in_time.strftime('%H:%M:%S') }}</strong></span>
+                                </div>
+                            {% endif %}
+
                             <div class="action-buttons">
                                 <form action="{{ url_for('checkin') }}" method="POST">
-                                    <button class="btn btn-success btn-action"><i class="fas fa-sign-in-alt me-2"></i> VÀO CA</button>
+                                    <button class="btn btn-success btn-action" {% if attendance_today %}disabled{% endif %}>
+                                        <i class="fas fa-sign-in-alt me-2"></i> VÀO CA
+                                    </button>
                                 </form>
                                 <form action="{{ url_for('checkout') }}" method="POST">
-                                    <button class="btn btn-warning btn-action"><i class="fas fa-sign-out-alt me-2"></i> TAN CA</button>
+                                    <button class="btn btn-warning btn-action" {% if not attendance_today or attendance_today.check_out_time %}disabled{% endif %}>
+                                        <i class="fas fa-sign-out-alt me-2"></i> TAN CA
+                                    </button>
                                 </form>
+                            </div>
+                        </div>
+
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <i class="bi bi-calendar-check fs-1 mb-2"></i>
+                                <h4>{{ stats.total_days }}</h4>
+                                <p class="mb-0">Ngày đi làm</p>
+                            </div>
+                            <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                                <i class="bi bi-check-circle fs-1 mb-2"></i>
+                                <h4>{{ stats.on_time }}</h4>
+                                <p class="mb-0">Đúng giờ</p>
+                            </div>
+                            <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                                <i class="bi bi-exclamation-triangle fs-1 mb-2"></i>
+                                <h4>{{ stats.late }}</h4>
+                                <p class="mb-0">Đi muộn</p>
+                            </div>
+                            <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                                <i class="bi bi-box-arrow-left fs-1 mb-2"></i>
+                                <h4>{{ stats.early }}</h4>
+                                <p class="mb-0">Về sớm</p>
                             </div>
                         </div>
 
@@ -92,6 +130,9 @@
                                     <thead>
                                         <tr>
                                             <th>#</th>
+                                            {% if session.get('role') == 'admin' %}
+                                            <th>Nhân viên</th>
+                                            {% endif %}
                                             <th>Ngày làm việc</th>
                                             <th>Giờ vào</th>
                                             <th>Giờ ra</th>
@@ -103,6 +144,11 @@
                                             {% for row in data %}
                                             <tr>
                                                 <td>{{ loop.index }}</td>
+                                                
+                                                {% if session.get('role') == 'admin' %}
+                                                <td><strong>{{ row.full_name }}</strong></td>
+                                                {% endif %}
+                                                
                                                 <td>{{ row.date }}</td>
                                                 <td><strong class="text-success">{{ row.check_in }}</strong></td>
                                                 <td><strong class="text-warning">{{ row.check_out }}</strong></td>
@@ -110,7 +156,9 @@
                                             </tr>
                                             {% endfor %}
                                         {% else %}
-                                            <tr><td colspan="5" class="text-center">Chưa có dữ liệu chấm công</td></tr>
+                                            <tr>
+                                                <td colspan="{{ 6 if session.get('role') == 'admin' else 5 }}" class="text-center">Chưa có dữ liệu chấm công</td>
+                                            </tr>
                                         {% endif %}
                                     </tbody>
                                 </table>

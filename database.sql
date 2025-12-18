@@ -1,4 +1,4 @@
--- Active: 1742794785791@@127.0.0.1@3306
+-- Active: 1761122691374@@127.0.0.1@3306
 CREATE DATABASE IF NOT EXISTS attendance_db;
 USE attendance_db;
 
