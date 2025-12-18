@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from functools import wraps
 import mysql.connector
 from datetime import datetime, timedelta
@@ -216,6 +216,65 @@ def checkout():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('403.html', current_user={'full_name': 'Khách', 'role': 'unknown'}), 404
+
+# ==================================================
+# 6.1 ADMIN - DANH SÁCH NHÂN VIÊN
+# ==================================================
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    conn = get_db()
+    users = []
+
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                users.user_id,
+                users.full_name,
+                users.username,
+                users.role,
+                departments.dept_name,
+                shifts.shift_name
+            FROM users
+            LEFT JOIN departments ON users.dept_id = departments.dept_id
+            LEFT JOIN shifts ON users.shift_id = shifts.shift_id
+            ORDER BY users.user_id DESC
+        """)
+        users = cursor.fetchall()
+        conn.close()
+
+    return render_template('admin/admin_users.html', users=users)
+
+# ==================================================
+# 6.2 ADMIN - XÓA NHÂN VIÊN (JS FETCH)
+# ==================================================
+@app.route('/admin/user/delete/<int:user_id>', methods=['POST'])
+@admin_required
+def delete_user(user_id):
+    conn = get_db()
+    if not conn:
+        return jsonify({"success": False, "message": "Lỗi kết nối CSDL"})
+
+    cursor = conn.cursor(dictionary=True)
+
+    # Không cho xóa admin
+    cursor.execute("SELECT role FROM users WHERE user_id = %s", (user_id,))
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "message": "Nhân viên không tồn tại"})
+
+    if user['role'] == 'admin':
+        conn.close()
+        return jsonify({"success": False, "message": "Không thể xóa tài khoản Admin"})
+
+    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "Xóa nhân viên thành công"})
 
 if __name__ == '__main__':
     app.run(debug=True)

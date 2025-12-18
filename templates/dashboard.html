@@ -20,12 +20,19 @@
                     <p>Chấm công thông minh</p>
                 </div>
                 <nav class="mt-4">
-                    <a href="/dashboard" class="menu-item active"><i class="bi bi-house-door-fill"></i><span>Trang chủ</span></a>
+                    <a href="{{ url_for('dashboard') }}" class="menu-item active"><i class="bi bi-house-door-fill"></i><span>Trang chủ</span></a>
                     <a href="#history" class="menu-item"><i class="bi bi-calendar-check"></i><span>Lịch sử</span></a>
                     {% if session.get('role') == 'admin' %}
-                    <a href="/admin/add_user" class="menu-item admin-only"><i class="bi bi-gear-fill"></i><span>Quản trị hệ thống</span></a>
+                    <a href="{{ url_for('admin_users') }}" class="menu-item admin-only">
+                        <i class="bi bi-people-fill"></i>
+                        <span>Quản lý nhân viên</span>
+                    </a>
                     {% endif %}
-                    <a href="/logout" class="menu-item" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1);"><i class="bi bi-box-arrow-right"></i><span>Đăng xuất</span></a>
+
+                    {% if session.get('role') == 'admin' %}
+                    <a href="{{ url_for('add_user') }}" class="menu-item admin-only"><i class="bi bi-gear-fill"></i><span>Quản trị hệ thống</span></a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="menu-item" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1);"><i class="bi bi-box-arrow-right"></i><span>Đăng xuất</span></a>
                 </nav>
             </div>
 
@@ -69,10 +76,10 @@
                             <div class="current-time text-muted mb-2" id="currentTime"><i class="fas fa-clock"></i> --:--:--</div>
                             <h4 class="mb-4 fw-bold" style="color: #667eea;">Chấm Công Hôm Nay</h4>
                             <div class="action-buttons">
-                                <form action="/checkin" method="POST">
+                                <form action="{{ url_for('checkin') }}" method="POST">
                                     <button class="btn btn-success btn-action"><i class="fas fa-sign-in-alt me-2"></i> VÀO CA</button>
                                 </form>
-                                <form action="/checkout" method="POST">
+                                <form action="{{ url_for('checkout') }}" method="POST">
                                     <button class="btn btn-warning btn-action"><i class="fas fa-sign-out-alt me-2"></i> TAN CA</button>
                                 </form>
                             </div>
