@@ -74,5 +74,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-});
 
+    // --- ĐOẠN MÃ THÊM MỚI: XỬ LÝ HIỆU ỨNG NÚT XUẤT EXCEL ---
+    const exportBtn = document.querySelector('a[href*="export_attendance"]');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            const originalContent = this.innerHTML;
+            // Hiển thị trạng thái đang xử lý khi Admin nhấn xuất
+            this.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Đang chuẩn bị file...';
+            this.classList.add('disabled');
+            this.style.pointerEvents = 'none';
+
+            // Khôi phục nút sau khi trình duyệt bắt đầu tải file
+            setTimeout(() => {
+                this.innerHTML = originalContent;
+                this.classList.remove('disabled');
+                this.style.pointerEvents = 'auto';
+            }, 3000);
+        });
+    }
+});
