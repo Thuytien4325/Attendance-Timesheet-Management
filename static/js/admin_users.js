@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const userName = this.getAttribute('data-user-name');
             const buttonElement = this;
             
-            if (confirm(`Bạn có chắc chắn muốn xóa nhân viên "${userName}"?`)) {
+            if (confirm(`CẢNH BÁO: Bạn có chắc chắn muốn xóa nhân viên "${userName}"?\nHành động này không thể hoàn tác!`)) {
                 // Vô hiệu hóa nút trong khi xử lý
                 buttonElement.disabled = true;
                 buttonElement.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xóa...';
@@ -33,12 +33,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             <i class="bi bi-check-circle-fill me-2"></i>${data.message || 'Xóa nhân viên thành công!'}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         `;
-                        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+                        // Chèn thông báo vào đầu container
+                        const container = document.querySelector('.container');
+                        container.insertBefore(alertDiv, container.firstChild);
                         
-                        // Xóa dòng khỏi bảng
-                        buttonElement.closest('tr').remove();
+                        // Xóa dòng khỏi bảng ngay lập tức
+                        const row = buttonElement.closest('tr');
+                        if (row) row.remove();
                         
-                        // Reload trang sau 1 giây để cập nhật danh sách
+                        // Reload trang sau 1 giây để cập nhật danh sách sạch sẽ
                         setTimeout(() => {
                             window.location.reload();
                         }, 1000);
@@ -62,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-danger alert-dismissible fade show';
                     alertDiv.innerHTML = `
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Có lỗi xảy ra khi xóa nhân viên!
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Lỗi kết nối hệ thống!
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     `;
                     document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
@@ -75,4 +78,3 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-
