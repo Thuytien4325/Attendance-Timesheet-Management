@@ -1,280 +1,311 @@
+<<<<<<< HEAD
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+=======
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
+>>>>>>> ef805d5bb9b9721a12e0ee6b221ec469d2816d01
 from functools import wraps
-import mysql.connector
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import config
 
 app = Flask(__name__)
-app.secret_key = config.SECRET_KEY
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7) 
+app.config.from_object(config)
 
-# Giả lập CSRF
+# --- KHẮC PHỤC LỖI 1: 'csrf_token' is undefined ---
+# Dòng này giúp template không bị lỗi khi tìm biến csrf_token
 app.jinja_env.globals['csrf_token'] = lambda: ''
 
-def get_db():
-    try:
-        return mysql.connector.connect(**config.DB_CONFIG)
-    except mysql.connector.Error as err:
-        print(f"Lỗi DB: {err}")
-        return None
+# Khởi tạo ORM
+db = SQLAlchemy(app)
 
-# ==================================================
-# 1. MIDDLEWARE / DECORATORS (ĐÚNG YÊU CẦU)
-# ==================================================
+# ============================================================================
+# 1. MODELS (CÁC LỚP ĐỐI TƯỢNG - OOP)
+# ============================================================================
 
-# Decorator: Bắt buộc đăng nhập (Dùng cho Dashboard, Profile...)
+class Department(db.Model):
+    __tablename__ = 'departments'
+    dept_id = db.Column(db.Integer, primary_key=True)
+    dept_name = db.Column(db.String(100), nullable=False)
+    users = db.relationship('User', backref='department', lazy=True)
+
+class Shift(db.Model):
+    __tablename__ = 'shifts'
+    shift_id = db.Column(db.Integer, primary_key=True)
+    shift_name = db.Column(db.String(50), nullable=False)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    late_grace_period = db.Column(db.Integer, default=15)
+    early_leave_threshold = db.Column(db.Integer, default=30)
+    users = db.relationship('User', backref='shift', lazy=True)
+
+    # [OOP METHOD] Logic tính toán trạng thái Check-in
+    def get_checkin_status(self, checkin_time):
+        shift_start_dt = datetime.combine(checkin_time.date(), self.start_time)
+        allowed_limit = shift_start_dt + timedelta(minutes=self.late_grace_period)
+
+        if checkin_time <= allowed_limit:
+            return 'Đúng giờ', False, f"✅ Check-in thành công lúc {checkin_time.strftime('%H:%M')}"
+        else:
+            late_minutes = int((checkin_time - shift_start_dt).total_seconds() / 60)
+            return 'Đi muộn', True, f"⏰ Check-in muộn {late_minutes} phút lúc {checkin_time.strftime('%H:%M')}"
+
+    # [OOP METHOD] Logic tính toán Check-out
+    def get_checkout_status(self, checkout_time, current_status):
+        shift_end_dt = datetime.combine(checkout_time.date(), self.end_time)
+        early_threshold = shift_end_dt - timedelta(minutes=self.early_leave_threshold)
+
+        if checkout_time < early_threshold:
+            early_minutes = int((shift_end_dt - checkout_time).total_seconds() / 60)
+            return 'Về sớm', f"⚠️ Về sớm {early_minutes} phút"
+        
+        final_status = current_status if current_status == 'Đi muộn' else 'Đúng giờ'
+        return final_status, "✅ Hoàn thành ca làm việc"
+
+class User(db.Model):
+    __tablename__ = 'users'
+    user_id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default='staff')
+    dept_id = db.Column(db.Integer, db.ForeignKey('departments.dept_id'))
+    shift_id = db.Column(db.Integer, db.ForeignKey('shifts.shift_id'))
+
+class Attendance(db.Model):
+    __tablename__ = 'attendance'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    work_date = db.Column(db.Date, nullable=False) # Cột này bắt buộc có dữ liệu
+    check_in_time = db.Column(db.DateTime)
+    check_out_time = db.Column(db.DateTime)
+    status = db.Column(db.String(50))
+    
+    # Quan hệ để lấy thông tin user từ bảng attendance (attendance.user.full_name)
+    user = db.relationship('User', backref='attendances')
+
+# ============================================================================
+# 2. MIDDLEWARE
+# ============================================================================
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            flash('Vui lòng đăng nhập để tiếp tục!', 'warning')
             return redirect('/')
         return f(*args, **kwargs)
     return decorated_function
 
-# Decorator: Bắt buộc là Admin (Dùng cho trang thêm nhân viên...)
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 1. Kiểm tra đăng nhập trước
-        if 'user_id' not in session:
-            return redirect('/')
-        
-        # 2. Kiểm tra quyền
+        if 'user_id' not in session: return redirect('/')
         if session.get('role') != 'admin':
-            # Truyền thông tin user vào template 403 để hiển thị
-            current_user = {
-                'full_name': session.get('name'),
-                'role': session.get('role')
-            }
-            return render_template('403.html', current_user=current_user), 403
-            
+            return render_template('403.html', current_user=session), 403
         return f(*args, **kwargs)
     return decorated_function
 
-# ==================================================
-# 2. ROUTE LOGIN (ĐÃ BỔ SUNG SESSION)
-# ==================================================
+# ============================================================================
+# 3. ROUTES
+# ============================================================================
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
-    if 'user_id' in session:
-        return redirect('/dashboard')
+    if 'user_id' in session: return redirect('/dashboard')
 
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        remember = request.form.get('remember_me')
         
-        conn = get_db()
-        if conn:
-            cursor = conn.cursor(dictionary=True)
-            # Lấy hết thông tin user + thông tin ca làm việc
-            cursor.execute("""
-                SELECT users.*, shifts.shift_name, shifts.start_time, shifts.end_time 
-                FROM users 
-                LEFT JOIN shifts ON users.shift_id = shifts.shift_id 
-                WHERE username=%s AND password=%s
-            """, (username, password))
-            user = cursor.fetchone()
-            conn.close()
+        # [OOP] Tìm user bằng ORM
+        user = User.query.filter_by(username=username, password=password).first()
 
-            if user:
-                session.permanent = True if remember else False
-                
-                # --- [QUAN TRỌNG] LƯU ĐỦ SESSION THEO YÊU CẦU ---
-                session['user_id'] = user['user_id']
-                session['name'] = user['full_name']
-                session['role'] = user['role']
-                session['dept_id'] = user['dept_id']   # <-- Đã thêm
-                session['shift_id'] = user['shift_id'] # <-- Đã thêm
-                
-                # Lưu text hiển thị cho đẹp
-                if user['shift_name']:
-                    session['shift_info'] = f"{user['shift_name']} ({user['start_time']} - {user['end_time']})"
-                else:
-                    session['shift_info'] = "Chưa xếp ca"
-                
-                flash('Đăng nhập thành công!', 'success')
-                return redirect('/dashboard')
+        if user:
+            session['user_id'] = user.user_id
+            session['name'] = user.full_name
+            session['role'] = user.role
+            
+            if user.shift:
+                s_time = user.shift.start_time.strftime('%H:%M')
+                e_time = user.shift.end_time.strftime('%H:%M')
+                session['shift_info'] = f"{user.shift.shift_name} ({s_time}-{e_time})"
             else:
-                flash('Sai tài khoản hoặc mật khẩu!', 'danger')
+                session['shift_info'] = "Chưa xếp ca"
+            
+            flash('Đăng nhập thành công!', 'success')
+            return redirect('/dashboard')
         else:
-            flash('Lỗi kết nối CSDL!', 'danger')
+            flash('Sai thông tin đăng nhập!', 'danger')
 
     return render_template('login.html')
 
-# ==================================================
-# 3. ROUTE LOGOUT
-# ==================================================
 @app.route('/logout')
 def logout():
-    session.clear() # Xóa sạch dữ liệu
-    flash('Đã đăng xuất hệ thống.', 'info')
+    session.clear()
     return redirect('/')
 
-# ==================================================
-# 4. DASHBOARD (SỬ DỤNG DECORATOR MỚI)
-# ==================================================
 @app.route('/dashboard')
-@login_required  # <-- Đã áp dụng Decorator kiểm tra đăng nhập
+@login_required 
 def dashboard():
-    conn = get_db()
-    formatted_history = []
+    current_user = User.query.get(session['user_id'])
+    today = date.today()
     
-    if conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM attendance WHERE user_id=%s ORDER BY check_in_time DESC LIMIT 30", (session['user_id'],))
-        data = cursor.fetchall()
+    # 1. Trạng thái hôm nay
+    attendance_today = Attendance.query.filter_by(user_id=current_user.user_id, work_date=today).first()
+
+    # 2. Lấy lịch sử (Admin thấy hết, Staff thấy mình)
+    if current_user.role == 'admin':
+        # [OOP] Join ngầm định nhờ relationship
+        history_query = Attendance.query.order_by(Attendance.check_in_time.desc()).limit(50).all()
+    else:
+        history_query = Attendance.query.filter_by(user_id=current_user.user_id)\
+                                        .order_by(Attendance.check_in_time.desc()).limit(30).all()
+    
+    # 3. Format dữ liệu
+    formatted_data = []
+    stats = {'total': 0, 'on_time': 0, 'late': 0, 'early': 0}
+    stats['total'] = len(history_query)
+
+    for att in history_query:
+        # Thống kê
+        if att.status in ['Đúng giờ', 'on_time']: stats['on_time'] += 1
+        elif att.status in ['Đi muộn', 'late']: stats['late'] += 1
+        elif att.status in ['Về sớm', 'early_leave']: stats['early'] += 1
         
-        for row in data:
-            date_str = row['check_in_time'].strftime('%d/%m/%Y')
-            in_time = row['check_in_time'].strftime('%H:%M')
-            out_time = row['check_out_time'].strftime('%H:%M') if row['check_out_time'] else "--:--"
-            
-            status_map = {'Đúng giờ': 'bg-success', 'Đi muộn': 'bg-danger', 'Về sớm': 'bg-warning text-dark'}
-            css_class = status_map.get(row['status'], 'bg-secondary')
-            
-            formatted_history.append({
-                'id': row['id'], 'date': date_str, 'check_in': in_time, 
-                'check_out': out_time, 'status': row['status'], 'css_class': css_class
-            })
-        conn.close()
-    
-    return render_template('dashboard.html', name=session['name'], data=formatted_history)
+        css_class = 'bg-secondary'
+        if att.status in ['Đúng giờ', 'on_time']: css_class = 'bg-success'
+        elif att.status in ['Đi muộn', 'late']: css_class = 'bg-danger'
+        elif att.status in ['Về sớm', 'early_leave']: css_class = 'bg-warning text-dark'
 
-# ==================================================
-# 5. ADMIN ROUTE (ĐÃ BẢO VỆ CHẶT CHẼ)
-# ==================================================
-@app.route('/admin/add_user', methods=['GET', 'POST'])
-@admin_required  # <-- Chỉ Admin mới vào được, Staff sẽ bị đá sang trang 403
-def add_user():
-    conn = get_db()
-    if request.method == 'POST':
-        try:
-            full_name = request.form['fullName']
-            username = request.form['username']
-            password = request.form['password']
-            dept_id = request.form['department']
-            shift_id = request.form['shift']
-            role = 'staff'
+        formatted_data.append({
+            'full_name': att.user.full_name, # [OOP] Lấy tên từ bảng User qua quan hệ
+            'date': att.check_in_time.strftime('%d/%m/%Y'),
+            'check_in': att.check_in_time.strftime('%H:%M'),
+            'check_out': att.check_out_time.strftime('%H:%M') if att.check_out_time else '--:--',
+            'status': att.status,
+            'css_class': css_class
+        })
 
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-            if cursor.fetchone():
-                flash('Tên đăng nhập đã tồn tại!', 'danger')
-            else:
-                cursor.execute("INSERT INTO users (full_name, username, password, dept_id, shift_id, role) VALUES (%s, %s, %s, %s, %s, %s)", 
-                               (full_name, username, password, dept_id, shift_id, role))
-                conn.commit()
-                flash(f'Đã thêm nhân viên {full_name}!', 'success')
-            cursor.close()
-            return redirect('/admin/add_user')
-        except Exception as e:
-            flash(f'Lỗi: {str(e)}', 'danger')
+    return render_template('dashboard.html', 
+                           attendance_today=attendance_today,
+                           stats=stats,
+                           data=formatted_data,
+                           shift=current_user.shift)
 
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM departments")
-    departments = cursor.fetchall()
-    cursor.execute("SELECT * FROM shifts")
-    shifts = cursor.fetchall()
-    conn.close()
-    return render_template('admin/add_employee.html', departments=departments, shifts=shifts)
-
-# ==================================================
-# 6. ROUTE CHỨC NĂNG (CHECKIN/OUT)
-# ==================================================
 @app.route('/checkin', methods=['POST'])
-@login_required # <-- Bảo vệ route này luôn
+@login_required
 def checkin():
-    conn = get_db()
-    if conn:
-        cursor = conn.cursor()
-        now = datetime.now()
-        # Ở đây bạn có thể dùng session['shift_id'] để so sánh giờ nếu muốn tính đi muộn
-        cursor.execute("INSERT INTO attendance (user_id, check_in_time, status) VALUES (%s, %s, %s)", 
-                        (session['user_id'], now, 'Đúng giờ'))
-        conn.commit()
-        conn.close()
-        flash('Check-in thành công!', 'success')
+    user = User.query.get(session['user_id'])
+    now = datetime.now()
+
+    # 1. Kiểm tra trùng
+    if Attendance.query.filter_by(user_id=user.user_id, work_date=now.date()).first():
+        flash('⚠️ Hôm nay bạn đã Check-in rồi!', 'warning')
+        return redirect('/dashboard')
+
+    if not user.shift:
+        flash('❌ Chưa được xếp ca!', 'danger')
+        return redirect('/dashboard')
+
+    # 2. Tính toán trạng thái bằng Method của Shift
+    status, is_late, message = user.shift.get_checkin_status(now)
+    msg_type = 'danger' if is_late else 'success'
+
+    # 3. Lưu vào DB (OOP)
+    # --- KHẮC PHỤC LỖI 2: Field 'work_date' doesn't have a default value ---
+    new_attendance = Attendance(
+        user_id=user.user_id,
+        work_date=now.date(),  # <-- QUAN TRỌNG: Phải truyền work_date vào đây
+        check_in_time=now,
+        status=status
+    )
+    
+    db.session.add(new_attendance)
+    db.session.commit()
+
+    flash(message, msg_type)
     return redirect('/dashboard')
 
 @app.route('/checkout', methods=['POST'])
 @login_required
 def checkout():
-    conn = get_db()
-    if conn:
-        cursor = conn.cursor()
-        now = datetime.now()
-        cursor.execute("UPDATE attendance SET check_out_time = %s WHERE user_id = %s AND check_out_time IS NULL ORDER BY check_in_time DESC LIMIT 1", 
-                       (now, session['user_id']))
-        conn.commit()
-        conn.close()
-        flash('Check-out thành công!', 'warning')
+    user = User.query.get(session['user_id'])
+    now = datetime.now()
+
+    attendance = Attendance.query.filter_by(user_id=user.user_id, work_date=now.date()).first()
+
+    if not attendance:
+        flash('⚠️ Chưa Check-in!', 'warning')
+        return redirect('/dashboard')
+    
+    if attendance.check_out_time:
+        flash('⚠️ Đã Check-out rồi!', 'warning')
+        return redirect('/dashboard')
+
+    # Tính toán
+    new_status, message = user.shift.get_checkout_status(now, attendance.status)
+    msg_type = 'warning' if new_status == 'Về sớm' else 'success'
+
+    # Cập nhật Object
+    attendance.check_out_time = now
+    attendance.status = new_status
+    db.session.commit()
+
+    flash(f"{message} lúc {now.strftime('%H:%M')}", msg_type)
     return redirect('/dashboard')
 
-# Xử lý lỗi 404
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('403.html', current_user={'full_name': 'Khách', 'role': 'unknown'}), 404
-
-# ==================================================
-# 6.1 ADMIN - DANH SÁCH NHÂN VIÊN
-# ==================================================
+# --- ADMIN ROUTES (OOP) ---
 @app.route('/admin/users')
 @admin_required
 def admin_users():
-    conn = get_db()
-    users = []
+    users_list = User.query.order_by(User.user_id.desc()).all()
+    view_data = []
+    for u in users_list:
+        view_data.append({
+            'user_id': u.user_id,
+            'full_name': u.full_name,
+            'username': u.username,
+            'role': u.role,
+            'dept_name': u.department.dept_name if u.department else 'Chưa xếp',
+            'shift_name': u.shift.shift_name if u.shift else 'Chưa xếp'
+        })
+    return render_template('admin/admin_users.html', users=view_data)
 
-    if conn:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT 
-                users.user_id,
-                users.full_name,
-                users.username,
-                users.role,
-                departments.dept_name,
-                shifts.shift_name
-            FROM users
-            LEFT JOIN departments ON users.dept_id = departments.dept_id
-            LEFT JOIN shifts ON users.shift_id = shifts.shift_id
-            ORDER BY users.user_id DESC
-        """)
-        users = cursor.fetchall()
-        conn.close()
+@app.route('/admin/add_user', methods=['GET', 'POST'])
+@admin_required
+def add_user():
+    if request.method == 'POST':
+        fullname = request.form['fullName']
+        username = request.form['username']
+        password = request.form['password']
+        dept_id = request.form['department']
+        shift_id = request.form['shift']
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username đã tồn tại!', 'danger')
+        else:
+            new_user = User(full_name=fullname, username=username, password=password, 
+                            dept_id=dept_id, shift_id=shift_id, role='staff')
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Thêm nhân viên thành công!', 'success')
+            return redirect('/admin/add_user')
 
-    return render_template('admin/admin_users.html', users=users)
+    depts = Department.query.all()
+    shifts = Shift.query.all()
+    return render_template('admin/add_employee.html', departments=depts, shifts=shifts)
 
-# ==================================================
-# 6.2 ADMIN - XÓA NHÂN VIÊN (JS FETCH)
-# ==================================================
 @app.route('/admin/user/delete/<int:user_id>', methods=['POST'])
 @admin_required
 def delete_user(user_id):
-    conn = get_db()
-    if not conn:
-        return jsonify({"success": False, "message": "Lỗi kết nối CSDL"})
-
-    cursor = conn.cursor(dictionary=True)
-
-    # Không cho xóa admin
-    cursor.execute("SELECT role FROM users WHERE user_id = %s", (user_id,))
-    user = cursor.fetchone()
-
-    if not user:
-        conn.close()
-        return jsonify({"success": False, "message": "Nhân viên không tồn tại"})
-
-    if user['role'] == 'admin':
-        conn.close()
-        return jsonify({"success": False, "message": "Không thể xóa tài khoản Admin"})
-
-    cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"success": True, "message": "Xóa nhân viên thành công"})
+    user = User.query.get(user_id)
+    if not user: return jsonify({'success': False, 'message': 'Không tồn tại'})
+    if user.role == 'admin': return jsonify({'success': False, 'message': 'Không thể xóa Admin'})
+    
+    # Xóa lịch sử điểm danh trước (nếu cần thiết để tránh lỗi khóa ngoại)
+    Attendance.query.filter_by(user_id=user_id).delete()
+    
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Xóa thành công'})
 
 
 # ==================================================
