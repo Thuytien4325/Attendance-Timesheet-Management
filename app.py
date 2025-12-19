@@ -1,5 +1,9 @@
+<<<<<<< HEAD
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+=======
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
+>>>>>>> ef805d5bb9b9721a12e0ee6b221ec469d2816d01
 from functools import wraps
 from datetime import datetime, timedelta, date
 import config
@@ -303,8 +307,68 @@ def delete_user(user_id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Xóa thành công'})
 
+
+# ==================================================
+# 7. CHỨC NĂNG BỔ SUNG: EXPORT EXCEL (PHONG CÁCH OOP)
+# ==================================================
+class AttendanceExcelExporter:
+    """Lớp xử lý logic truy vấn và xuất file Excel chuyên nghiệp"""
+    
+    def __init__(self, db_config):
+        import pandas as pd
+        from sqlalchemy import create_engine
+        self.pd = pd
+        # Khởi tạo engine kết nối hỗ trợ UTF-8 để không lỗi font tiếng Việt
+        db_uri = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}?charset=utf8mb4"
+        self.engine = create_engine(db_uri)
+
+    def get_full_data(self):
+        """Truy vấn dữ liệu kết hợp thông tin nhân viên và phòng ban"""
+        query = """
+            SELECT 
+                a.id AS 'ID',
+                u.full_name AS 'Họ và Tên',
+                d.dept_name AS 'Phòng ban',
+                a.check_in_time AS 'Giờ vào',
+                a.check_out_time AS 'Giờ ra',
+                a.status AS 'Trạng thái'
+            FROM attendance a
+            JOIN users u ON a.user_id = u.user_id
+            LEFT JOIN departments d ON u.dept_id = d.dept_id
+            ORDER BY a.check_in_time DESC
+        """
+        return self.pd.read_sql(query, self.engine)
+
+    def export(self):
+        """Tạo luồng dữ liệu file .xlsx (In-memory stream)"""
+        import io
+        df = self.get_full_data()
+        output = io.BytesIO()
+        # Xuất file Excel với định dạng chuẩn
+        with self.pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Báo cáo công')
+        output.seek(0)
+        return output
+
+@app.route('/admin/export_attendance')
+@admin_required 
+def export_attendance():
+    try:
+        # Sử dụng lớp AttendanceExcelExporter để xử lý (OOP)
+        exporter = AttendanceExcelExporter(config.DB_CONFIG)
+        excel_stream = exporter.export()
+        
+        # Gửi file về trình duyệt để tải xuống
+        return send_file(
+            excel_stream,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=f"Bao_cao_diem_danh_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        )
+    except Exception as e:
+        flash(f"Lỗi khi xuất file: {str(e)}", "danger")
+        return redirect(url_for('admin_users'))
+
+# --- DI CHUYỂN LỆNH CHẠY APP XUỐNG DƯỚI CÙNG ĐỂ NHẬN DIỆN ĐỦ ROUTE ---
 if __name__ == '__main__':
-    with app.app_context():
-        # Lệnh này giúp tạo bảng nếu chưa có, nhưng vì bạn đã có DB rồi nên nó sẽ bỏ qua
-        db.create_all()
     app.run(debug=True)
