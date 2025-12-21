@@ -1,0 +1,16 @@
+body { background-color: #1a1a2e; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; margin: 0; }
+.scanner-wrapper { width: 100%; max-width: 500px; padding: 20px; }
+.scanner-card { background: #16213e; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+.icon-box { font-size: 3rem; background: #e94560; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: white; }
+.camera-container { position: relative; border-radius: 15px; overflow: hidden; border: 2px solid #e94560; background: black; height: 350px; }
+#reader { width: 100%; height: 100%; }
+#reader video { object-fit: cover; width: 100%; height: 100%; }
+.scan-line { position: absolute; width: 100%; height: 2px; background: #00ff00; top: 0; z-index: 10; box-shadow: 0 0 4px #00ff00; animation: scanAnimation 2s infinite linear; }
+@keyframes scanAnimation { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+.status-box { text-align: center; color: #fff; min-height: 40px; }
+.result-card { display: none; background: white; border-radius: 15px; padding: 20px; margin-top: 20px; animation: slideUp 0.3s ease-out; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.result-card.success { border-left: 5px solid #28a745; }
+.result-card.error { border-left: 5px solid #dc3545; }
+.result-icon { width: 50px; height: 50px; background: #f8f9fa; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #333; }
+.time-stamp { text-align: right; font-size: 0.8rem; color: #888; margin-top: 10px; }

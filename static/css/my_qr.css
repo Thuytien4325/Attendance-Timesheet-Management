@@ -1,0 +1,14 @@
+body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; font-family: 'Segoe UI', sans-serif; }
+.qr-container { max-width: 600px; margin: 0 auto; }
+.qr-card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; animation: slideIn 0.5s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+.user-avatar { width: 100px; height: 100px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 48px; color: white; }
+.user-info h2 { color: #333; margin-bottom: 5px; font-weight: 700; }
+.qr-code-wrapper { background: #f8f9fa; padding: 30px; border-radius: 15px; margin: 30px 0; border: 3px dashed #667eea; }
+#qrCodeImage { max-width: 100%; height: auto; border-radius: 10px; background: white; padding: 10px; }
+.qr-refresh { color: #667eea; cursor: pointer; margin-top: 10px; font-size: 14px; }
+.qr-refresh:hover { color: #764ba2; text-decoration: underline; }
+.instructions { background: #e3f2fd; padding: 20px; border-radius: 10px; margin-top: 30px; text-align: left; border-left: 4px solid #2196f3; }
+.btn-custom { padding: 12px 30px; border-radius: 50px; font-weight: 600; margin: 5px; }
+.btn-primary-custom { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; }
+.btn-outline-custom { background: white; color: #667eea; border: 2px solid #667eea; }

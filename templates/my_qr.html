@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Mã QR Của Tôi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_qr.css') }}">
+</head>
+<body>
+    <div class="qr-container">
+        <div class="qr-card">
+            <div class="user-avatar"><i class="fas fa-user"></i></div>
+            <div class="user-info">
+                <h2>{{ user.full_name }}</h2>
+                <p>
+                    <span class="badge bg-primary">{{ user.role|upper }}</span>
+                    {% if user.shift %}
+                        <span class="badge bg-secondary">{{ user.shift.shift_name }}</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="qr-code-wrapper">
+                <h4 class="mb-3"><i class="fas fa-qrcode"></i> Mã QR Check-in</h4>
+                <img id="qrCodeImage" src="{{ url_for('generate_qr') }}" alt="QR Code">
+                <div class="qr-refresh" onclick="refreshQR()">
+                    <i class="fas fa-sync-alt"></i> Làm mới mã QR
+                </div>
+            </div>
+            <div class="mb-3">
+                <button class="btn btn-primary-custom btn-custom" onclick="downloadQR()">
+                    <i class="fas fa-download"></i> Tải xuống
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-custom btn-custom">
+                    <i class="fas fa-arrow-left"></i> Về Dashboard
+                </a>
+            </div>
+            <div class="instructions">
+                <h5><i class="fas fa-info-circle"></i> Hướng dẫn</h5>
+                <ol>
+                    <li>Sử dụng mã này tại máy quét QR của công ty.</li>
+                    <li>Mỗi mã chứa thông tin định danh duy nhất của bạn.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/my_qr.js') }}"></script>
+</body>
+</html>

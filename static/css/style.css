@@ -37,13 +37,6 @@ body { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba
 .btn-success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
 .btn-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 
-/* STATS & TABLE */
-.stats-row { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
-.stat-box { flex: 1; min-width: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-.attendance-table { width: 100%; border-collapse: collapse; }
-.attendance-table thead { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-.attendance-table th, .attendance-table td { padding: 15px; border-bottom: 1px solid #eee; }
-
 /* RESPONSIVE */
 .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 999; }
 .overlay.show { display: block; }
@@ -55,3 +48,13 @@ body { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba
     .btn-action { min-width: 100%; padding: 20px; }
     .main-content { padding: 20px; }
 }
+
+/* --- QUAN TRỌNG: CODE SỬA MÀU CÁC Ô THỐNG KÊ --- */
+.stat-box.bg-primary { background: linear-gradient(45deg, #4e73df, #224abe) !important; color: #fff !important; }
+.stat-box.bg-success { background: linear-gradient(45deg, #1cc88a, #13855c) !important; color: #fff !important; }
+.stat-box.bg-danger { background: linear-gradient(45deg, #e74a3b, #be2617) !important; color: #fff !important; }
+/* Đã sửa màu vàng và ép chữ màu trắng */
+.stat-box.bg-warning { background: linear-gradient(45deg, #f6c23e, #dda20a) !important; color: #fff !important; }
+
+/* Làm mờ icon bên trong */
+.stat-box i { opacity: 0.3 !important; color: #fff !important; }
