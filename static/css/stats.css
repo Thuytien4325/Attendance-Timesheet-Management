@@ -1,0 +1,35 @@
+/* public/css/stats.css */
+
+.card {
+    border-radius: 12px; /* Bo tròn góc thẻ */
+    overflow: hidden;
+}
+
+.card-header {
+    font-weight: 600;
+    color: #444;
+}
+
+/* Định kích thước khung chứa biểu đồ tròn */
+.chart-wrapper-pie {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* Định kích thước khung chứa biểu đồ cột */
+.chart-wrapper-bar {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 768px) {
+    .chart-wrapper-pie, 
+    .chart-wrapper-bar {
+        height: 250px;
+    }
+}

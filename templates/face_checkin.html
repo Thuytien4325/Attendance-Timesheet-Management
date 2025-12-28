@@ -27,58 +27,53 @@
     </div>
 
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const status = document.getElementById('status');
-        let isProcessing = false;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas'); // ✅ FIX
+    const status = document.getElementById('status');
+    let isProcessing = false;
 
-        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-            .then(stream => video.srcObject = stream);
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(stream => video.srcObject = stream);
 
-        // Gửi ảnh mỗi 2 giây
-        setInterval(() => {
-            if (!isProcessing) captureAndSend();
-        }, 2000);
+    // Gửi ảnh mỗi 2 giây
+    setInterval(() => {
+        if (!isProcessing) captureAndSend();
+    }, 2000);
 
-        function captureAndSend() {
-            isProcessing = true;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            // Nén ảnh (chất lượng 0.7) để gửi nhanh hơn
-            const imageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+    function captureAndSend() {
+        isProcessing = true;
 
-            fetch('/api/face-checkin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: imageBase64 })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    status.className = "fw-bold text-success";
-                    status.innerHTML = `✅ ${data.message}`;
-                    
-                    // Dừng 3s để đọc thông báo
-                    setTimeout(() => { 
-                        status.className = "fw-bold text-white";
-                        status.innerText = "Sẵn sàng người tiếp theo...";
-                        isProcessing = false; 
-                    }, 3000);
-                } else {
-                    if (!data.message.includes("Đang tìm")) {
-                        status.className = "fw-bold text-danger";
-                        status.innerText = data.message;
-                    } else {
-                        status.className = "fw-bold text-warning";
-                        status.innerText = "🔍 Đang tìm khuôn mặt...";
-                    }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        // ✅ JPEG – KHÔNG CÒN WEBP
+        const imageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+        fetch('/api/face-checkin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imageBase64 })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                status.className = "fw-bold text-success";
+                status.innerHTML = `✅ ${data.message}`;
+
+                setTimeout(() => {
+                    status.className = "fw-bold text-white";
+                    status.innerText = "Sẵn sàng người tiếp theo...";
                     isProcessing = false;
-                }
-            })
-            .catch(() => isProcessing = false);
-        }
-    </script>
+                }, 3000);
+            } else {
+                status.className = "fw-bold text-warning";
+                status.innerText = data.message || "🔍 Đang tìm khuôn mặt...";
+                isProcessing = false;
+            }
+        })
+        .catch(() => isProcessing = false);
+    }
+</script>
 </body>
 </html>
