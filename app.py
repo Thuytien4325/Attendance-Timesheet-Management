@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from functools import wraps
 from datetime import datetime, timedelta, date
-import config
 import qrcode
 import io
 import json
@@ -13,75 +11,24 @@ import base64
 import cv2
 import pandas as pd
 
-app = Flask(__name__)
-app.config.from_object(config)
+# --- IMPORT CÁC MODULE ĐÃ TÁCH (SOLID) ---
+from config import Config
+from extensions import db
+from models import User, Shift, Department, Attendance
+from services import TimekeepingService
 
-# Fix lỗi CSRF cho template
+app = Flask(__name__)
+# Nạp cấu hình từ file config.py
+app.config.from_object(Config)
+
+# Khởi tạo DB
+db.init_app(app)
+
+# Fix lỗi CSRF cho giao diện
 app.jinja_env.globals['csrf_token'] = lambda: ''
 
-db = SQLAlchemy(app)
-
 # ==================================================
-# 1. MODELS
-# ==================================================
-class Department(db.Model):
-    __tablename__ = 'departments'
-    dept_id = db.Column(db.Integer, primary_key=True)
-    dept_name = db.Column(db.String(100), nullable=False)
-    users = db.relationship('User', backref='department', lazy=True)
-
-class Shift(db.Model):
-    __tablename__ = 'shifts'
-    shift_id = db.Column(db.Integer, primary_key=True)
-    shift_name = db.Column(db.String(50), nullable=False)
-    start_time = db.Column(db.Time, nullable=False)
-    end_time = db.Column(db.Time, nullable=False)
-    late_grace_period = db.Column(db.Integer, default=15)
-    early_leave_threshold = db.Column(db.Integer, default=30)
-    users = db.relationship('User', backref='shift', lazy=True)
-
-    def get_checkin_status(self, checkin_time):
-        shift_start_dt = datetime.combine(checkin_time.date(), self.start_time)
-        allowed_limit = shift_start_dt + timedelta(minutes=self.late_grace_period)
-        if checkin_time <= allowed_limit:
-            return 'Đúng giờ', False, f"✅ Check-in thành công lúc {checkin_time.strftime('%H:%M')}"
-        else:
-            late_minutes = int((checkin_time - shift_start_dt).total_seconds() / 60)
-            return 'Đi muộn', True, f"⏰ Muộn {late_minutes} phút"
-
-    def get_checkout_status(self, checkout_time, current_status):
-        shift_end_dt = datetime.combine(checkout_time.date(), self.end_time)
-        early_threshold = shift_end_dt - timedelta(minutes=self.early_leave_threshold)
-        if checkout_time < early_threshold:
-            return 'Về sớm', f"⚠️ Về sớm lúc {checkout_time.strftime('%H:%M')}"
-        
-        final_status = current_status if current_status == 'Đi muộn' else 'Đúng giờ'
-        return final_status, "✅ Hoàn thành ca làm việc"
-
-class User(db.Model):
-    __tablename__ = 'users'
-    user_id = db.Column(db.Integer, primary_key=True)
-    full_name = db.Column(db.String(100), nullable=False)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='staff')
-    dept_id = db.Column(db.Integer, db.ForeignKey('departments.dept_id'))
-    shift_id = db.Column(db.Integer, db.ForeignKey('shifts.shift_id'))
-    face_encoding = db.Column(db.Text) 
-
-class Attendance(db.Model):
-    __tablename__ = 'attendance'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
-    work_date = db.Column(db.Date, nullable=False)
-    check_in_time = db.Column(db.DateTime)
-    check_out_time = db.Column(db.DateTime)
-    status = db.Column(db.String(50))
-    notes = db.Column(db.Text)
-    user = db.relationship('User', backref='attendances')
-
-# ==================================================
-# 2. MIDDLEWARE & AUTH ROUTES
+# 1. MIDDLEWARE (Kiểm tra đăng nhập)
 # ==================================================
 def login_required(f):
     @wraps(f)
@@ -98,6 +45,9 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# ==================================================
+# 2. AUTH ROUTES (Đăng nhập/Đăng xuất)
+# ==================================================
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'user_id' in session: return redirect('/dashboard')
@@ -110,7 +60,7 @@ def login():
             session['shift_info'] = f"{user.shift.shift_name}" if user.shift else "Chưa xếp ca"
             flash('Đăng nhập thành công!', 'success')
             return redirect('/dashboard')
-        flash('Sai thông tin!', 'danger')
+        flash('Sai thông tin đăng nhập!', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -119,7 +69,7 @@ def logout():
     return redirect('/')
 
 # ==================================================
-# 3. DASHBOARD & CHECKIN LOGIC
+# 3. DASHBOARD (Trang chủ)
 # ==================================================
 @app.route('/dashboard')
 @login_required 
@@ -128,13 +78,13 @@ def dashboard():
     today = date.today()
     att_today = Attendance.query.filter_by(user_id=user.user_id, work_date=today).first()
 
-    # Lấy lịch sử
+    # Lấy lịch sử chấm công
     query = Attendance.query
     if user.role != 'admin':
         query = query.filter_by(user_id=user.user_id)
     history = query.order_by(Attendance.check_in_time.desc()).limit(50).all()
     
-    # Format dữ liệu hiển thị
+    # Xử lý dữ liệu hiển thị ra bảng
     data = []
     stats = {'total': len(history), 'on_time': 0, 'late': 0, 'early': 0}
     
@@ -160,30 +110,28 @@ def dashboard():
 
     return render_template('dashboard.html', attendance_today=att_today, stats=stats, data=data, shift=user.shift)
 
+# ==================================================
+# 4. CHỨC NĂNG CHẤM CÔNG (Gọi Service Logic)
+# ==================================================
 @app.route('/checkin', methods=['POST'])
 @login_required
 def checkin():
     user = User.query.get(session['user_id'])
     now = datetime.now()
+    
     if Attendance.query.filter_by(user_id=user.user_id, work_date=now.date()).first():
-        flash('Đã check-in rồi!', 'warning')
-        return redirect('/dashboard')
+        flash('Hôm nay bạn đã Check-in rồi!', 'warning'); return redirect('/dashboard')
     
     if not user.shift:
-        flash('Chưa xếp ca!', 'danger')
-        return redirect('/dashboard')
+        flash('Chưa được xếp ca làm việc!', 'danger'); return redirect('/dashboard')
 
-    status, is_late, msg = user.shift.get_checkin_status(now)
+    # [SOLID] Gọi Logic tính toán từ Service
+    status, is_late, msg = TimekeepingService.calculate_checkin_status(now, user.shift)
     
-    new_att = Attendance(
-        user_id=user.user_id, 
-        work_date=now.date(), 
-        check_in_time=now, 
-        status=status, 
-        notes="Thủ công"
-    )
+    new_att = Attendance(user_id=user.user_id, work_date=now.date(), check_in_time=now, status=status, notes="Thủ công")
     db.session.add(new_att)
     db.session.commit()
+    
     flash(msg, 'danger' if is_late else 'success')
     return redirect('/dashboard')
 
@@ -194,14 +142,12 @@ def checkout():
     now = datetime.now()
     att = Attendance.query.filter_by(user_id=user.user_id, work_date=now.date()).first()
     
-    if not att:
-        flash('Chưa check-in!', 'warning')
-        return redirect('/dashboard')
-    if att.check_out_time:
-        flash('Đã check-out!', 'warning')
-        return redirect('/dashboard')
+    if not att: flash('Chưa check-in!', 'warning'); return redirect('/dashboard')
+    if att.check_out_time: flash('Đã check-out!', 'warning'); return redirect('/dashboard')
 
-    status, msg = user.shift.get_checkout_status(now, att.status)
+    # [SOLID] Gọi Logic tính toán từ Service
+    status, msg = TimekeepingService.calculate_checkout_status(now, user.shift, att.status)
+    
     att.check_out_time = now
     att.status = status
     db.session.commit()
@@ -209,7 +155,7 @@ def checkout():
     return redirect('/dashboard')
 
 # ==================================================
-# 4. API THỐNG KÊ (CHO BIỂU ĐỒ)
+# 5. API THỐNG KÊ (Biểu đồ)
 # ==================================================
 @app.route('/api/stats')
 @login_required
@@ -229,41 +175,19 @@ def api_stats():
         # Biểu đồ cột
         week_ago = today - timedelta(days=6)
         daily = db.session.query(Attendance.work_date, func.count(Attendance.id)).filter(Attendance.work_date >= week_ago).group_by(Attendance.work_date).all()
-        bar_labels, bar_data = [], []
+        bar_l, bar_d = [], []
         temp = {d[0]: d[1] for d in daily}
-        
         for i in range(7):
             d = week_ago + timedelta(days=i)
-            bar_labels.append(d.strftime('%d/%m'))
-            bar_data.append(temp.get(d, 0))
+            bar_l.append(d.strftime('%d/%m'))
+            bar_d.append(temp.get(d, 0))
             
-        return jsonify({'success': True, 'pie': pie, 'bar': {'labels': bar_labels, 'data': bar_data}})
+        return jsonify({'success': True, 'pie': pie, 'bar': {'labels': bar_l, 'data': bar_d}})
     except Exception as e: return jsonify({'success': False, 'message': str(e)}), 500
 
 # ==================================================
-# 5. QR CODE & FACE ID ROUTES
+# 6. FACE ID & QR CODE (Có fix lỗi ảnh)
 # ==================================================
-@app.route('/my-qr')
-@login_required
-def my_qr():
-    user = User.query.get(session['user_id'])
-    data = {'user_id': user.user_id, 'ts': str(datetime.now())}
-    return render_template('my_qr.html', user=user, qr_data_json=json.dumps(data))
-
-@app.route('/generate-qr')
-@login_required
-def generate_qr():
-    user = User.query.get(session['user_id'])
-    data = {'user_id': user.user_id, 'ts': str(datetime.now())}
-    img = qrcode.make(json.dumps(data))
-    buf = io.BytesIO()
-    img.save(buf)
-    buf.seek(0)
-    return send_file(buf, mimetype='image/png')
-
-@app.route('/scan')
-def scan(): return render_template('scan_qr.html')
-
 @app.route('/scan-checkin', methods=['POST'])
 def scan_checkin():
     try:
@@ -276,25 +200,59 @@ def scan_checkin():
         if Attendance.query.filter_by(user_id=user.user_id, work_date=now.date()).first():
             return jsonify({'success': False, 'message': 'Đã chấm công rồi!'}), 400
             
-        status, _, _ = user.shift.get_checkin_status(now)
-        # Thêm class màu cho frontend
+        # [SOLID] Gọi Service
+        status, _, _ = TimekeepingService.calculate_checkin_status(now, user.shift)
         status_class = 'success' if 'Đúng' in status else 'danger'
         
         db.session.add(Attendance(user_id=user.user_id, work_date=now.date(), check_in_time=now, status=status, notes="QR Code"))
         db.session.commit()
+        return jsonify({'success': True, 'message': 'Thành công', 'user': {'full_name': user.full_name}, 'status': status, 'status_class': status_class, 'shift_name': user.shift.shift_name, 'time': now.strftime('%H:%M')})
+    except: return jsonify({'success': False, 'message': 'Lỗi QR'}), 500
+
+@app.route('/api/face-checkin', methods=['POST'])
+def api_face_checkin():
+    try:
+        data = request.get_json()
+        img_bytes = base64.b64decode(data['image'].split(',')[1])
+        nparr = np.frombuffer(img_bytes, np.uint8)
         
-        return jsonify({
-            'success': True, 
-            'message': 'Thành công', 
-            'user': {'full_name': user.full_name}, 
-            'status': status, 
-            'status_class': status_class,
-            'shift_name': user.shift.shift_name if user.shift else "Chưa xếp",
-            'time': now.strftime('%H:%M')
-        })
-    except Exception as e: 
-        print(f"Lỗi Scan QR: {e}")
-        return jsonify({'success': False, 'message': 'Lỗi QR'}), 500
+        # --- FIX LỖI ẢNH FACE ID ---
+        img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+        if img is None: return jsonify({'success': False, 'message': 'Ảnh lỗi'})
+        
+        if len(img.shape) == 3 and img.shape[2] == 4: img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        elif len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
+        # ---------------------------
+        
+        boxes = face_recognition.face_locations(rgb)
+        if not boxes: return jsonify({'success': False, 'message': 'Đang tìm mặt...'})
+        
+        unknown_enc = face_recognition.face_encodings(rgb, boxes)[0]
+        users = User.query.filter(User.face_encoding != None).all()
+        found = None
+        for u in users:
+            try:
+                known = np.array(json.loads(u.face_encoding))
+                if face_recognition.compare_faces([known], unknown_enc, tolerance=0.5)[0]: found = u; break
+            except: continue
+        
+        if not found: return jsonify({'success': False, 'message': 'Không nhận diện được'})
+        
+        now = datetime.now()
+        if Attendance.query.filter_by(user_id=found.user_id, work_date=now.date()).first():
+            return jsonify({'success': False, 'message': f'{found.full_name} đã chấm công!'})
+            
+        # [SOLID] Gọi Service
+        status, _, _ = TimekeepingService.calculate_checkin_status(now, found.shift)
+        status_class = 'success' if 'Đúng' in status else 'danger'
+
+        db.session.add(Attendance(user_id=found.user_id, work_date=now.date(), check_in_time=now, status=status, notes="FaceID"))
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Xin chào {found.full_name}', 'status': status, 'status_class': status_class, 'time': now.strftime('%H:%M')})
+    except Exception as e: return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/register-face', methods=['GET', 'POST'])
 @login_required
@@ -305,22 +263,13 @@ def register_face():
         img_bytes = base64.b64decode(data['image'].split(',')[1])
         nparr = np.frombuffer(img_bytes, np.uint8)
         
-        # --- FIX 1: Xử lý đa dạng định dạng ảnh (PNG, v.v.) ---
+        # --- FIX LỖI ẢNH FACE ID ---
         img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
-        if img is None:
-            return jsonify({'success': False, 'message': 'Ảnh không hợp lệ'})
-
-        # Xử lý RGBA (4 kênh màu) -> BGR
-        if len(img.shape) == 3 and img.shape[2] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        # Xử lý Grayscale (1 kênh màu) -> BGR
-        elif len(img.shape) == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-        # Chuyển sang RGB và ép kiểu contiguous cho dlib
+        if len(img.shape) == 3 and img.shape[2] == 4: img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        elif len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
-        # -----------------------------------------------------
+        # ---------------------------
         
         boxes = face_recognition.face_locations(rgb)
         if not boxes: return jsonify({'success': False, 'message': 'Không thấy mặt'})
@@ -330,78 +279,29 @@ def register_face():
         user.face_encoding = json.dumps(enc.tolist())
         db.session.commit()
         return jsonify({'success': True, 'message': 'Đăng ký thành công'})
-    except Exception as e: 
-        print(f"Lỗi Register Face: {e}")
-        return jsonify({'success': False, 'message': str(e)})
+    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+
+# ==================================================
+# 7. ROUTE PHỤ TRỢ (QR View, Admin...)
+# ==================================================
+@app.route('/my-qr')
+@login_required
+def my_qr():
+    return render_template('my_qr.html', user=User.query.get(session['user_id']), qr_data_json=json.dumps({'user_id': session['user_id']}))
+
+@app.route('/generate-qr')
+@login_required
+def generate_qr():
+    img = qrcode.make(json.dumps({'user_id': session['user_id'], 'ts': str(datetime.now())}))
+    buf = io.BytesIO(); img.save(buf); buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
+@app.route('/scan')
+def scan(): return render_template('scan_qr.html')
 
 @app.route('/face-checkin')
 def face_checkin_page(): return render_template('face_checkin.html')
 
-@app.route('/api/face-checkin', methods=['POST'])
-def api_face_checkin():
-    try:
-        data = request.get_json()
-        img_bytes = base64.b64decode(data['image'].split(',')[1])
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        
-        # --- FIX 2: Xử lý đa dạng định dạng ảnh (Tương tự ở trên) ---
-        img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
-        if img is None:
-            return jsonify({'success': False, 'message': 'Ảnh lỗi'})
-
-        # Xử lý RGBA -> BGR
-        if len(img.shape) == 3 and img.shape[2] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        # Xử lý Grayscale -> BGR
-        elif len(img.shape) == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-        # Chuyển sang RGB và ép kiểu
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
-        # ------------------------------------------------------------
-        
-        boxes = face_recognition.face_locations(rgb)
-        if not boxes: return jsonify({'success': False, 'message': 'Đang tìm mặt...'})
-        
-        unknown_enc = face_recognition.face_encodings(rgb, boxes)[0]
-        users = User.query.filter(User.face_encoding != None).all()
-        
-        found = None
-        for u in users:
-            try:
-                known = np.array(json.loads(u.face_encoding))
-                if face_recognition.compare_faces([known], unknown_enc, tolerance=0.5)[0]:
-                    found = u; break
-            except: continue
-        
-        if not found: return jsonify({'success': False, 'message': 'Không nhận diện được'})
-        
-        now = datetime.now()
-        if Attendance.query.filter_by(user_id=found.user_id, work_date=now.date()).first():
-            return jsonify({'success': False, 'message': f'{found.full_name} đã chấm công!'})
-            
-        status, _, _ = found.shift.get_checkin_status(now)
-        # Thêm class màu
-        status_class = 'success' if 'Đúng' in status else 'danger'
-
-        db.session.add(Attendance(user_id=found.user_id, work_date=now.date(), check_in_time=now, status=status, notes="FaceID"))
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Xin chào {found.full_name}', 
-            'status': status, 
-            'status_class': status_class,
-            'time': now.strftime('%H:%M')
-        })
-    except Exception as e: 
-        print(f"Lỗi Face Checkin: {e}")
-        return jsonify({'success': False, 'message': 'Lỗi hệ thống'})
-
-# ==================================================
-# 6. ADMIN ROUTES
-# ==================================================
 @app.route('/admin/users')
 @admin_required
 def admin_users():
@@ -413,22 +313,17 @@ def admin_users():
 @admin_required
 def add_user():
     if request.method == 'POST':
-        if User.query.filter_by(username=request.form['username']).first():
-            flash('Username tồn tại!', 'danger')
+        if User.query.filter_by(username=request.form['username']).first(): flash('Username tồn tại!', 'danger')
         else:
             u = User(full_name=request.form['fullName'], username=request.form['username'], password=request.form['password'], dept_id=request.form['department'], shift_id=request.form['shift'])
-            db.session.add(u); db.session.commit()
-            flash('Thêm thành công', 'success'); return redirect('/admin/add_user')
+            db.session.add(u); db.session.commit(); flash('Thêm thành công', 'success'); return redirect('/admin/add_user')
     return render_template('admin/add_employee.html', departments=Department.query.all(), shifts=Shift.query.all())
 
 @app.route('/admin/user/delete/<int:id>', methods=['POST'])
 @admin_required
 def delete_user(id):
     u = User.query.get(id)
-    if not u: return jsonify({'success': False, 'message': 'Không tìm thấy'})
-    if u.role == 'admin': return jsonify({'success': False, 'message': 'Không xóa Admin'})
-    Attendance.query.filter_by(user_id=id).delete()
-    db.session.delete(u); db.session.commit()
+    if u.role != 'admin': Attendance.query.filter_by(user_id=id).delete(); db.session.delete(u); db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/admin/export_attendance')
@@ -437,18 +332,11 @@ def export_attendance():
     try:
         q = db.session.query(Attendance.work_date, User.full_name, Department.dept_name, Attendance.check_in_time, Attendance.check_out_time, Attendance.status, Attendance.notes).join(User).outerjoin(Department).all()
         df = pd.DataFrame(q, columns=['Ngày', 'Tên', 'Phòng', 'Vào', 'Ra', 'Trạng thái', 'Ghi chú'])
-        
-        # Format lại giờ
-        df['Vào'] = pd.to_datetime(df['Vào']).dt.strftime('%H:%M:%S')
-        df['Ra'] = pd.to_datetime(df['Ra']).dt.strftime('%H:%M:%S')
-        
         out = io.BytesIO()
         with pd.ExcelWriter(out, engine='openpyxl') as writer: df.to_excel(writer, index=False)
         out.seek(0)
         return send_file(out, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", as_attachment=True, download_name="BaoCao.xlsx")
-    except Exception as e:
-        flash(f"Lỗi xuất file: {e}", "danger")
-        return redirect(url_for('admin_users'))
+    except Exception as e: return redirect('/dashboard')
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()

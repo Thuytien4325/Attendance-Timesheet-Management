@@ -1,79 +1,167 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <title>Chấm công Face ID</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #1a1a2e; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .camera-frame { position: relative; width: 640px; height: 480px; border: 5px solid #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 0 20px rgba(0,255,0,0.3); }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        .scan-line { position: absolute; width: 100%; height: 2px; background: #0f0; top: 0; animation: scan 2s infinite; box-shadow: 0 0 10px #0f0; }
-        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
-    </style>
-</head>
-<body>
-    <h2 class="mb-4">🤖 Hệ thống Chấm công Khuôn mặt</h2>
-    
-    <div class="camera-frame">
-        <video id="video" autoplay muted></video>
-        <div class="scan-line"></div>
-    </div>
-    <canvas id="canvas" style="display:none;"></canvas>
+{% extends "base.html" %}
+{% block title %}Face ID Check-in{% endblock %}
 
-    <div class="mt-4 text-center">
-        <h3 id="status" class="fw-bold text-warning">Đang tìm khuôn mặt...</h3>
-        <button class="btn btn-outline-light btn-sm mt-3" onclick="window.location.href='/'">Về trang chủ</button>
-    </div>
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-lg">
+                <div class="card-header bg-gradient text-white text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h3 class="mb-0">🎭 Chấm công bằng Face ID</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="position-relative">
+                                <video id="video" width="100%" height="480" autoplay style="border: 3px solid #667eea; border-radius: 15px; background: #000;"></video>
+                                <canvas id="canvas" style="display:none;"></canvas>
+                                
+                                <!-- Overlay hướng dẫn -->
+                                <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 10px; color: white;">
+                                    <strong>👤 Hãy nhìn thẳng vào camera</strong>
+                                </div>
+                            </div>
+                        </div>
 
-    <script>
+                        <div class="col-md-4">
+                            <div class="alert alert-info">
+                                <h5>📋 Hướng dẫn:</h5>
+                                <ul class="small">
+                                    <li>Đảm bảo ánh sáng đủ</li>
+                                    <li>Nhìn thẳng vào camera</li>
+                                    <li>Giữ khuôn mặt ổn định</li>
+                                    <li>Hệ thống tự động quét</li>
+                                </ul>
+                            </div>
+
+                            <div id="statusBox" class="alert alert-secondary">
+                                <strong>Trạng thái:</strong> <span id="statusText">Đang khởi động camera...</span>
+                            </div>
+
+                            <div id="result"></div>
+
+                            <button id="manualCapture" class="btn btn-primary btn-block mb-2" style="display:none;">
+                                <i class="bi bi-camera-fill"></i> Chụp thủ công
+                            </button>
+                            
+                            <a href="/dashboard" class="btn btn-secondary btn-block">
+                                <i class="bi bi-arrow-left"></i> Quay lại
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas'); // ✅ FIX
-    const status = document.getElementById('status');
+    const canvas = document.getElementById('canvas');
+    const statusText = document.getElementById('statusText');
+    const statusBox = document.getElementById('statusBox');
+    const resultDiv = document.getElementById('result');
+    const manualBtn = document.getElementById('manualCapture');
+
     let isProcessing = false;
+    let scanInterval;
 
-    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-        .then(stream => video.srcObject = stream);
+    // Khởi động webcam
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+        }
+    })
+    .then(stream => {
+        video.srcObject = stream;
+        statusText.textContent = '✅ Camera sẵn sàng - Đang quét khuôn mặt...';
+        statusBox.className = 'alert alert-success';
+        
+        // Bật nút chụp thủ công
+        manualBtn.style.display = 'block';
+        
+        // Tự động quét mỗi 2 giây
+        scanInterval = setInterval(captureAndCheck, 2000);
+    })
+    .catch(err => {
+        statusText.textContent = '❌ Không thể truy cập webcam';
+        statusBox.className = 'alert alert-danger';
+        resultDiv.innerHTML = `<div class="alert alert-danger">Lỗi: ${err.message}</div>`;
+    });
 
-    // Gửi ảnh mỗi 2 giây
-    setInterval(() => {
-        if (!isProcessing) captureAndSend();
-    }, 2000);
-
-    function captureAndSend() {
+    // Hàm chụp và kiểm tra Face ID
+    async function captureAndCheck() {
+        if (isProcessing) return;
         isProcessing = true;
 
+        // Vẽ ảnh từ video lên canvas
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
 
-        // ✅ JPEG – KHÔNG CÒN WEBP
-        const imageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        // Chuyển sang JPEG để đảm bảo tương thích
+        const imageData = canvas.toDataURL('image/jpeg', 0.95);
 
-        fetch('/api/face-checkin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: imageBase64 })
-        })
-        .then(res => res.json())
-        .then(data => {
+        try {
+            const response = await fetch('/api/face-checkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            });
+
+            const data = await response.json();
+
             if (data.success) {
-                status.className = "fw-bold text-success";
-                status.innerHTML = `✅ ${data.message}`;
+                // Dừng quét
+                clearInterval(scanInterval);
+                
+                statusText.textContent = '✅ Nhận diện thành công!';
+                statusBox.className = 'alert alert-success';
 
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h5>✅ ${data.message}</h5>
+                        <hr>
+                        <p class="mb-1"><strong>Thời gian:</strong> ${data.time}</p>
+                        <p class="mb-1"><strong>Trạng thái:</strong> <span class="badge badge-${data.status_class}">${data.status}</span></p>
+                        ${data.confidence ? `<p class="mb-0"><strong>Độ tin cậy:</strong> ${data.confidence}</p>` : ''}
+                    </div>`;
+
+                // Tắt video sau 3 giây
                 setTimeout(() => {
-                    status.className = "fw-bold text-white";
-                    status.innerText = "Sẵn sàng người tiếp theo...";
-                    isProcessing = false;
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                    video.style.display = 'none';
+                    resultDiv.innerHTML += '<div class="alert alert-info mt-3">Đang chuyển về trang chủ...</div>';
+                    setTimeout(() => window.location.href = '/dashboard', 2000);
                 }, 3000);
+
             } else {
-                status.className = "fw-bold text-warning";
-                status.innerText = data.message || "🔍 Đang tìm khuôn mặt...";
-                isProcessing = false;
+                // Chỉ hiển thị lỗi quan trọng, bỏ qua "Đang tìm khuôn mặt..."
+                if (!data.message.includes('Đang tìm')) {
+                    statusText.textContent = data.message;
+                    statusBox.className = 'alert alert-warning';
+                }
             }
-        })
-        .catch(() => isProcessing = false);
+        } catch (error) {
+            console.error('Lỗi:', error);
+        }
+
+        isProcessing = false;
     }
+
+    // Nút chụp thủ công
+    manualBtn.addEventListener('click', () => {
+        clearInterval(scanInterval);
+        captureAndCheck();
+        setTimeout(() => scanInterval = setInterval(captureAndCheck, 2000), 3000);
+    });
 </script>
-</body>
-</html>
+
+<style>
+    .badge-success { background-color: #28a745; color: white; }
+    .badge-danger { background-color: #dc3545; color: white; }
+</style>
+{% endblock %}
