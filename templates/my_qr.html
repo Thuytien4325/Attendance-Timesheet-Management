@@ -4,46 +4,39 @@
     <meta charset="UTF-8">
     <title>Mã QR Của Tôi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_qr.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
 </head>
-<body>
-    <div class="qr-container">
-        <div class="qr-card">
-            <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-info">
-                <h2>{{ user.full_name }}</h2>
-                <p>
-                    <span class="badge bg-primary">{{ user.role|upper }}</span>
-                    {% if user.shift %}
-                        <span class="badge bg-secondary">{{ user.shift.shift_name }}</span>
-                    {% endif %}
-                </p>
-            </div>
-            <div class="qr-code-wrapper">
-                <h4 class="mb-3"><i class="fas fa-qrcode"></i> Mã QR Check-in</h4>
-                <img id="qrCodeImage" src="{{ url_for('generate_qr') }}" alt="QR Code">
-                <div class="qr-refresh" onclick="refreshQR()">
-                    <i class="fas fa-sync-alt"></i> Làm mới mã QR
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card shadow border-0 rounded-4 text-center">
+                    <div class="card-header bg-primary text-white py-3 rounded-top-4">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-qr-code me-2"></i>Thẻ Chấm Công Điện Tử</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-3">
+                            <img src="{{ user.avatar if user.avatar else 'https://ui-avatars.com/api/?name=' + user.full_name }}" 
+                                 class="rounded-circle border border-3 border-light shadow-sm" width="80" height="80">
+                            <h5 class="mt-2 fw-bold text-dark">{{ user.full_name }}</h5>
+                            <span class="badge bg-secondary">{{ user.role }}</span>
+                        </div>
+                        
+                        <div class="p-3 bg-white border rounded-3 mb-3 d-inline-block">
+                            <img src="{{ url_for('generate_qr') }}" alt="QR Code" class="img-fluid" width="250">
+                        </div>
+                        
+                        <p class="text-muted small">Đưa mã này vào trước camera máy chấm công để Check-in/Check-out.</p>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="/dashboard" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Quay lại Dashboard
+                            </a>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="mb-3">
-                <button class="btn btn-primary-custom btn-custom" onclick="downloadQR()">
-                    <i class="fas fa-download"></i> Tải xuống
-                </button>
-                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-custom btn-custom">
-                    <i class="fas fa-arrow-left"></i> Về Dashboard
-                </a>
-            </div>
-            <div class="instructions">
-                <h5><i class="fas fa-info-circle"></i> Hướng dẫn</h5>
-                <ol>
-                    <li>Sử dụng mã này tại máy quét QR của công ty.</li>
-                    <li>Mỗi mã chứa thông tin định danh duy nhất của bạn.</li>
-                </ol>
             </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/my_qr.js') }}"></script>
 </body>
 </html>

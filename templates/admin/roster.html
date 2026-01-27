@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Xếp Lịch Làm Việc</title>
+    <title>Xếp Lịch Làm Việc - Admin</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -11,10 +11,13 @@
         .today-column { background-color: #fff3cd !important; border-left: 2px solid #ffc107; border-right: 2px solid #ffc107; }
         .roster-table thead th { position: sticky; top: 0; z-index: 10; background: #212529; color: white; }
         
-        /* Các class bổ sung để tránh viết logic trong thuộc tính style */
-        .shift-selected { background-color: #e8f5e9 !important; color: #198754 !important; }
-        .shift-off { background-color: #f8f9fa !important; color: #adb5bd !important; }
-        .select-custom { cursor: pointer; transition: all 0.2s; }
+        /* Style cho ô select để hiển thị đẹp hơn */
+        .select-custom { cursor: pointer; transition: all 0.2s; font-size: 0.9rem; }
+        .shift-selected { background-color: #e8f5e9 !important; color: #198754 !important; font-weight: 600; border: 1px solid #c3e6cb; }
+        .shift-off { background-color: #f8f9fa !important; color: #adb5bd !important; font-weight: normal; }
+        
+        /* Hover effect */
+        .roster-table tbody tr:hover { background-color: #f1f1f1; }
     </style>
 </head>
 <body class="bg-light">
@@ -25,7 +28,7 @@
             
             <div class="btn-group shadow-sm">
                 <a href="{{ url_for('admin_roster', week=week_offset-1) }}" class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i> Tuần trước</a>
-                <button class="btn btn-white border disabled fw-bold px-4">
+                <button class="btn btn-white border disabled fw-bold px-4 text-dark">
                     {{ dates[0].strftime('%d/%m') }} - {{ dates[6].strftime('%d/%m') }}
                 </button>
                 <a href="{{ url_for('admin_roster', week=week_offset+1) }}" class="btn btn-outline-secondary">Tuần sau <i class="bi bi-chevron-right"></i></a>
@@ -37,7 +40,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
@@ -52,7 +55,7 @@
                         <table class="table table-bordered roster-table mb-0">
                             <thead>
                                 <tr>
-                                    <th style="min-width: 200px; z-index: 20;">Nhân viên</th>
+                                    <th style="min-width: 200px; z-index: 20;" class="bg-dark">Nhân viên</th>
                                     {% for d in dates %}
                                     <th class="{{ 'bg-warning text-dark' if d == today_date else '' }}">
                                         <div class="day-header">{{ d.strftime('%A') }}</div>
@@ -64,7 +67,9 @@
                             <tbody>
                                 {% for user in users %}
                                 <tr>
-                                    <td class="text-start ps-3 fw-bold">{{ user.full_name }}</td>
+                                    <td class="text-start ps-3 fw-bold bg-white position-sticky start-0" style="z-index: 5;">
+                                        <i class="bi bi-person-circle text-secondary me-2"></i>{{ user.full_name }}
+                                    </td>
                                     
                                     {% for d in dates %}
                                     {% set d_str = d.strftime('%Y-%m-%d') %}
@@ -72,14 +77,16 @@
                                     
                                     <td class="p-1 {{ 'today-column' if d == today_date else '' }}">
                                         <select name="schedule_{{ user.user_id }}_{{ d_str }}" 
-                                                class="form-select form-select-sm border-0 text-center fw-bold select-custom {{ 'shift-selected' if current_shift_id else 'shift-off' }}">
+                                                class="form-select form-select-sm border-0 text-center select-custom {{ 'shift-selected' if current_shift_id else 'shift-off' }}">
                                             
                                             <option value="OFF" class="text-muted small">-- OFF --</option>
                                             
                                             {% for shift in shifts %}
                                             <option value="{{ shift.shift_id }}" 
                                                 {% if current_shift_id == shift.shift_id %}selected{% endif %}>
-                                                {{ shift.shift_name }} ({{ shift.start_time.strftime('%H:%M') }})
+                                                {{ shift.shift_name }} 
+                                                ({{ shift.start_time.strftime('%H:%M') if shift.start_time else '??' }} - 
+                                                 {{ shift.end_time.strftime('%H:%M') if shift.end_time else '??' }})
                                             </option>
                                             {% endfor %}
                                         </select>
@@ -87,7 +94,7 @@
                                     {% endfor %}
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="8" class="text-center py-5 text-muted">Chưa có nhân viên.</td></tr>
+                                <tr><td colspan="8" class="text-center py-5 text-muted">Chưa có nhân viên nào trong hệ thống.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -103,6 +110,19 @@
         </form>
     </div>
 
+    <script>
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', function() {
+                if (this.value === 'OFF') {
+                    this.classList.remove('shift-selected');
+                    this.classList.add('shift-off');
+                } else {
+                    this.classList.remove('shift-off');
+                    this.classList.add('shift-selected');
+                }
+            });
+        });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

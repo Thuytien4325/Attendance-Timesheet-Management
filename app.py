@@ -23,7 +23,7 @@ db.init_app(app)
 app.jinja_env.globals['csrf_token'] = lambda: ''
 
 # ==================================================
-# 1. MIDDLEWARE
+# 1. MIDDLEWARE (KIỂM TRA ĐĂNG NHẬP)
 # ==================================================
 def login_required(f):
     @wraps(f)
@@ -41,7 +41,7 @@ def admin_required(f):
     return decorated_function
 
 # ==================================================
-# 2. AUTH ROUTES
+# 2. XỬ LÝ ĐĂNG NHẬP / ĐĂNG XUẤT
 # ==================================================
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -60,7 +60,7 @@ def login():
 def logout(): session.clear(); return redirect('/')
 
 # ==================================================
-# 3. DASHBOARD
+# 3. TRANG DASHBOARD (ĐÃ SỬA LỖI STRFTIME)
 # ==================================================
 @app.route('/dashboard')
 @login_required 
@@ -79,28 +79,36 @@ def dashboard():
     data = []
     stats = {'total': len(history), 'on_time': 0, 'late': 0, 'early': 0}
     for row in history:
+        # Xử lý an toàn cho status
         st = row.status.lower() if row.status else ""
         if 'đúng' in st: stats['on_time'] += 1
         elif 'muộn' in st: stats['late'] += 1
         elif 'sớm' in st: stats['early'] += 1
         
+        # Xử lý CSS class
+        css_class = 'bg-secondary'
+        if 'đúng' in st: css_class = 'bg-success'
+        elif 'muộn' in st: css_class = 'bg-danger'
+        elif 'sớm' in st: css_class = 'bg-warning text-dark'
+
         data.append({
             'id': row.id,
             'full_name': row.user.full_name,
             'date': row.work_date.strftime('%d/%m/%Y'),
+            # FIX LỖI: Kiểm tra None trước khi format giờ
             'check_in': row.check_in_time.strftime('%H:%M') if row.check_in_time else '--:--',
             'check_out': row.check_out_time.strftime('%H:%M') if row.check_out_time else '--:--',
             'status': row.status,
             'notes': row.notes,
             'approval': row.approval_status,
             'approval_css': 'text-warning' if row.approval_status == 'Pending' else ('text-success' if row.approval_status == 'Approved' else 'text-danger'),
-            'css_class': 'bg-success' if 'đúng' in st else ('bg-danger' if 'muộn' in st else 'bg-warning text-dark')
+            'css_class': css_class
         })
 
     return render_template('dashboard.html', attendance_today=att_today, stats=stats, data=data, today_shift=today_shift)
 
 # ==================================================
-# 4. CHẤM CÔNG (THỦ CÔNG) - BẠN ĐANG THIẾU PHẦN NÀY
+# 4. CHỨC NĂNG CHẤM CÔNG (THỦ CÔNG, GIẢI TRÌNH)
 # ==================================================
 @app.route('/checkin', methods=['POST'])
 @login_required
@@ -167,7 +175,7 @@ def submit_explanation():
     flash(msg, 'success' if success else 'danger'); return redirect('/dashboard')
 
 # ==================================================
-# 5. ADMIN & ROSTER
+# 5. QUẢN TRỊ VIÊN (ADMIN) - ĐÃ SỬA LỖI EXPORT
 # ==================================================
 @app.route('/admin/roster', methods=['GET', 'POST'])
 @admin_required
@@ -236,15 +244,38 @@ def process_approval(id, action):
 @app.route('/admin/export_attendance')
 @admin_required
 def export_attendance():
-    q = db.session.query(Attendance.work_date, User.full_name, Department.dept_name, Attendance.check_in_time, Attendance.check_out_time, Attendance.status, Attendance.approval_status).join(User).outerjoin(Department).all()
-    df = pd.DataFrame(q, columns=['Ngày', 'Họ Tên', 'Phòng', 'Vào', 'Ra', 'Trạng thái', 'Duyệt'])
+    # --- ĐÃ SỬA LỖI INVALID REQUEST: THÊM select_from(Attendance) ---
+    q = db.session.query(
+        Attendance.work_date, 
+        User.full_name, 
+        Department.dept_name, 
+        Attendance.check_in_time, 
+        Attendance.check_out_time, 
+        Attendance.status, 
+        Attendance.approval_status
+    ).select_from(Attendance).join(User).outerjoin(Department).all()
+    
+    # Xử lý format ngày giờ để xuất Excel đẹp hơn
+    data_list = []
+    for item in q:
+        data_list.append({
+            'Ngày': item.work_date,
+            'Họ Tên': item.full_name,
+            'Phòng': item.dept_name,
+            'Vào': item.check_in_time.strftime('%H:%M') if item.check_in_time else '',
+            'Ra': item.check_out_time.strftime('%H:%M') if item.check_out_time else '',
+            'Trạng thái': item.status,
+            'Duyệt': item.approval_status
+        })
+
+    df = pd.DataFrame(data_list)
     out = io.BytesIO(); 
     with pd.ExcelWriter(out, engine='openpyxl') as writer: df.to_excel(writer, index=False)
     out.seek(0)
     return send_file(out, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", as_attachment=True, download_name="BaoCao.xlsx")
 
 # ==================================================
-# 6. FACE ID & QR & API
+# 6. FACE ID & QR & API (UTILITIES)
 # ==================================================
 @app.route('/scan-checkin', methods=['POST'])
 def scan_checkin():
@@ -277,7 +308,6 @@ def api_face_checkin():
         nparr = np.frombuffer(base64.b64decode(data['image'].split(',')[1]), np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
         
-        # Fix lỗi ảnh
         if len(img.shape) == 3 and img.shape[2] == 4: img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         elif len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB); rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
@@ -302,7 +332,6 @@ def api_face_checkin():
             db.session.commit()
             return jsonify({'success': True, 'message': f'Xin chào {found.full_name}', 'status': status, 'time': now.strftime('%H:%M')})
         elif not att.check_out_time:
-            # Face ID cũng hỗ trợ check-out
             status, msg, ot = TimekeepingService.calculate_checkout_status(now, found, att.status)
             att.check_out_time = now; att.status = status; att.overtime_minutes = ot; att.notes = (att.notes or "") + " | Face Out"
             db.session.commit()
@@ -319,7 +348,6 @@ def register_face():
         nparr = np.frombuffer(base64.b64decode(data['image'].split(',')[1]), np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
         
-        # Fix lỗi ảnh
         if len(img.shape) == 3 and img.shape[2] == 4: img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         elif len(img.shape) == 2: img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB); rgb = np.ascontiguousarray(rgb, dtype=np.uint8)

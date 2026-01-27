@@ -2,45 +2,142 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Máy Quét Chấm Công</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/scan_qr.css') }}">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body { background-color: #000; color: white; height: 100vh; display: flex; flex-direction: column; }
+        .scanner-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        #reader { width: 100%; max-width: 500px; border-radius: 12px; overflow: hidden; border: 2px solid #0d6efd; background: #222; }
+        
+        /* Chỉnh giao diện vùng quét */
+        #reader video { object-fit: cover; border-radius: 12px; }
+        
+        .result-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); z-index: 9999;
+            display: none; align-items: center; justify-content: center; text-align: center;
+        }
+        .scan-line { width: 100%; height: 2px; background: red; position: absolute; top: 50%; animation: scan 2s infinite; opacity: 0.6; }
+        @keyframes scan { 0% {top: 10%} 50% {top: 90%} 100% {top: 10%} }
+    </style>
 </head>
 <body>
-    <div class="scanner-wrapper">
-        <div class="scanner-card">
-            <div class="text-center mb-4">
-                <div class="icon-box"><i class="fas fa-camera"></i></div>
-                <h2 class="text-white fw-bold">Máy Chấm Công QR</h2>
-                <p class="text-white-50">Đưa mã QR vào khung hình bên dưới</p>
-            </div>
-            <div class="camera-container">
-                <div id="reader"></div>
-                <div class="scan-line"></div>
-            </div>
-            <div class="status-box mt-4" id="statusBox">
-                <div class="spinner-border text-light spinner-sm mb-2" role="status" id="loadingSpinner"></div>
-                <h5 id="statusText" class="mb-0">Đang khởi động Camera...</h5>
-            </div>
-            <div id="resultCard" class="result-card">
-                <div class="d-flex align-items-center">
-                    <div class="result-icon me-3"><i class="fas fa-user-check"></i></div>
-                    <div>
-                        <h4 id="resName" class="mb-1 fw-bold">User Name</h4>
-                        <div id="resStatus" class="badge bg-success">Status</div>
-                    </div>
-                </div>
-                <hr>
-                <p id="resMsg" class="mb-0 small">Message content...</p>
-                <div class="time-stamp" id="resTime">00:00:00</div>
-            </div>
-            <div class="mt-4 text-center">
-                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light btn-sm opacity-50"><i class="fas fa-arrow-left"></i> Về Dashboard</a>
+
+    <div class="d-flex justify-content-between align-items-center p-3 bg-dark border-bottom border-secondary">
+        <a href="/dashboard" class="btn btn-outline-light btn-sm">🔙 Thoát</a>
+        <span class="fw-bold">📷 MÁY QUÉT</span>
+        <button class="btn btn-sm btn-primary" onclick="switchMode()">📂 Upload</button>
+    </div>
+
+    <div class="scanner-wrapper p-3">
+        <div id="camera-mode" class="w-100 text-center">
+            <div id="reader"></div>
+            <p class="mt-3 text-white-50 small">Đưa mã QR vào khung hình</p>
+        </div>
+
+        <div id="upload-mode" class="w-100 text-center" style="display: none;">
+            <div class="card bg-dark text-white border-secondary p-4 mx-auto" style="max-width: 400px;">
+                <h5>Tải ảnh QR lên</h5>
+                <p class="text-muted small">Dùng khi camera bị lỗi hoặc test trên PC</p>
+                <input type="file" class="form-control mb-3" id="qr-input-file" accept="image/*">
+                <div id="file-status" class="mt-2"></div>
             </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/scan_qr.js') }}"></script>
+
+    <div id="result-overlay" class="result-overlay" onclick="closeOverlay()">
+        <div class="p-4 bg-white text-dark rounded-4 shadow-lg" style="width: 90%; max-width: 400px;">
+            <div id="res-icon" class="display-1 mb-2">✅</div>
+            <h3 id="res-title" class="fw-bold">Thành công!</h3>
+            <p id="res-msg" class="fs-5">Đã chấm công cho Nguyễn Văn A</p>
+            <p class="text-muted small">Chạm vào màn hình để tiếp tục quét...</p>
+        </div>
+    </div>
+
+    <audio id="beep" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+
+    <script>
+        let html5QrcodeScanner;
+        const resultOverlay = document.getElementById('result-overlay');
+        const beepAudio = document.getElementById('beep');
+        let isProcessing = false;
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (isProcessing) return; // Chặn quét liên tục
+            isProcessing = true;
+            beepAudio.play();
+
+            // Gửi dữ liệu về server
+            fetch('/scan-checkin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ qr_data: decodedText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                showResult(data);
+            })
+            .catch(err => {
+                showResult({success: false, message: "Lỗi kết nối Server!"});
+            });
+        }
+
+        function showResult(data) {
+            const icon = document.getElementById('res-icon');
+            const title = document.getElementById('res-title');
+            const msg = document.getElementById('res-msg');
+
+            resultOverlay.style.display = 'flex';
+            
+            if (data.success) {
+                icon.innerHTML = '✅';
+                title.innerText = "THÀNH CÔNG";
+                title.className = "fw-bold text-success";
+                msg.innerHTML = `<b>${data.message}</b><br>⏰ ${data.time}`;
+            } else {
+                icon.innerHTML = '❌';
+                title.innerText = "THẤT BẠI";
+                title.className = "fw-bold text-danger";
+                msg.innerText = data.message;
+            }
+        }
+
+        function closeOverlay() {
+            resultOverlay.style.display = 'none';
+            // Tạm dừng 2 giây trước khi cho phép quét tiếp để tránh nhầm
+            setTimeout(() => { isProcessing = false; }, 1000);
+        }
+
+        // Cấu hình Camera
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            showTorchButtonIfSupported: true 
+        });
+        html5QrcodeScanner.render(onScanSuccess);
+
+        // --- XỬ LÝ CHẾ ĐỘ UPLOAD ẢNH ---
+        function switchMode() {
+            const cam = document.getElementById('camera-mode');
+            const up = document.getElementById('upload-mode');
+            if (cam.style.display === 'none') {
+                cam.style.display = 'block'; up.style.display = 'none';
+            } else {
+                cam.style.display = 'none'; up.style.display = 'block';
+            }
+        }
+
+        const html5QrCodeFile = new Html5Qrcode("reader");
+        document.getElementById('qr-input-file').addEventListener('change', e => {
+            if (e.target.files.length == 0) return;
+            const imageFile = e.target.files[0];
+            html5QrCodeFile.scanFile(imageFile, true)
+            .then(decodedText => { onScanSuccess(decodedText); })
+            .catch(err => { alert("Không tìm thấy mã QR trong ảnh!"); });
+        });
+    </script>
 </body>
 </html>
