@@ -102,6 +102,10 @@ class AttendanceService:
         rows = self._attendance.get_recent_for_user(user_id, limit)
         return [self._to_ui(r) for r in rows]
 
+    def get_today_record(self, user_id: int, today: date):
+        """Get today's attendance record for a user"""
+        return self._attendance.get_for_user_and_date(user_id, today)
+
     def _to_ui(self, r) -> dict:
         status = r.status
         label = {

@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -20,9 +21,24 @@
                     <h4>TimeKeeper</h4>
                     <p>Chấm công thông minh</p>
                 </div>
+
+                <!-- QR Code Section in Sidebar -->
+                <div class="sidebar-qr-section">
+                    <div style="text-align: center; padding: 20px 15px; border-top: 1px solid rgba(255,255,255,0.1); border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <p style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 12px; font-weight: 500;">
+                            <i class="fas fa-qrcode" style="color: #667eea; margin-right: 6px;"></i>Mã QR Của Tôi
+                        </p>
+                        <div id="sidebar-qr-code" style="background: white; padding: 10px; border-radius: 8px; display: inline-block;"></div>
+                        <p style="color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-top: 8px;">ID: <strong style="color: white;">{{ session.get('user_id') }}</strong></p>
+                    </div>
+                </div>
+
                 <nav class="mt-4">
                     <a href="{{ url_for('dashboard') }}" class="menu-item {% if active_page == 'dashboard' %}active{% endif %}">
                         <i class="bi bi-house-door-fill"></i><span>Trang chủ</span>
+                    </a>
+                    <a href="{{ url_for('qr_scan_page') }}" class="menu-item">
+                        <i class="bi bi-qr-code"></i><span>Quét QR Chấm Công</span>
                     </a>
                     <a href="{{ url_for('dashboard') }}#history" class="menu-item">
                         <i class="bi bi-calendar-check"></i><span>Lịch sử</span>
@@ -48,6 +64,9 @@
                     {% if session.get('role') == 'admin' %}
                     <a href="{{ url_for('admin_users') }}" class="menu-item admin-only {% if active_page == 'admin_users' %}active{% endif %}">
                         <i class="bi bi-people-fill"></i><span>Quản lý nhân viên</span>
+                    </a>
+                    <a href="{{ url_for('admin_qr_view') }}" class="menu-item admin-only {% if active_page == 'admin_qr' %}active{% endif %}">
+                        <i class="bi bi-qr-code-scan"></i><span>Quản lý Mã QR</span>
                     </a>
                     <a href="{{ url_for('admin_report') }}" class="menu-item admin-only {% if active_page == 'admin_report' %}active{% endif %}">
                         <i class="bi bi-clipboard2-data"></i><span>Báo cáo chấm công</span>
@@ -107,6 +126,27 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    // Generate QR Code in Sidebar
+    document.addEventListener('DOMContentLoaded', function() {
+        const qrContainer = document.getElementById('sidebar-qr-code');
+        const userId = '{{ session.get("user_id") }}';
+        
+        if (qrContainer && userId) {
+            QRCode.toCanvas(document.getElementById('sidebar-qr-code'), userId, {
+                errorCorrectionLevel: 'H',
+                type: 'image/png',
+                quality: 0.92,
+                margin: 1,
+                width: 150,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
+        }
+    });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

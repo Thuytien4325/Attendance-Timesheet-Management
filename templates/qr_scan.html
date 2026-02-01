@@ -1,0 +1,190 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Quét QR Chấm Công - Hệ thống Chấm Công{% endblock %}
+
+{% block content %}
+<div class="qr-scan-container">
+    <div class="qr-scan-card">
+        <div class="qr-scan-header">
+            <i class="fas fa-qrcode" style="font-size: 2.5rem; color: #667eea; margin-bottom: 15px;"></i>
+            <h2 class="fw-bold" style="color: #2c3e50;">Quét Mã QR Chấm Công</h2>
+            <p class="text-muted">Vui lòng quét mã QR trên cửa văn phòng</p>
+        </div>
+
+        <div class="qr-scanner-area">
+            <div id="qr-reader"></div>
+            <div id="qr-status" class="qr-status" style="display: none;"></div>
+        </div>
+
+        <div class="qr-instructions mt-4">
+            <h5 style="color: #667eea;">Hướng dẫn:</h5>
+            <ul style="text-align: left; color: #555;">
+                <li>Hướng camera của thiết bị lên mã QR</li>
+                <li>Giữ thiết bị cách mã QR khoảng 15-20cm</li>
+                <li>Đợi đến khi camera phát hiện và xử lý mã QR</li>
+                <li>Hệ thống sẽ tự động chấm công cho bạn</li>
+            </ul>
+        </div>
+
+        <div class="qr-actions mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i> Quay lại Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Html5-QRCode Library -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusDiv = document.getElementById('qr-status');
+    let scannerRunning = false;
+
+    function onScanSuccess(decodedText, decodedResult) {
+        if (scannerRunning) {
+            scannerRunning = false;
+            
+            console.log(`QR Code scanned: ${decodedText}`);
+            
+            // Stop scanner
+            html5QrcodeScanner.clear();
+
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Đang xử lý...</div>';
+            
+            // Send to backend
+            fetch("{{ url_for('api_qr_checkin') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: decodedText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ' + data.message + '</div>';
+                    // Auto redirect after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('dashboard') }}";
+                    }, 2000);
+                } else {
+                    statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ' + data.message + '<br><small>Bấm nút bên dưới để quét lại</small></div>';
+                    // Enable scanner again
+                    setTimeout(() => {
+                        scannerRunning = true;
+                        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+                    }, 1000);
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i> Lỗi kết nối server!</div>';
+                setTimeout(() => {
+                    scannerRunning = true;
+                    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+                }, 1500);
+            });
+        }
+    }
+
+    function onScanFailure(error) {
+        // Camera scanning but no QR detected - do nothing
+    }
+
+    let html5QrcodeScanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+        },
+        false
+    );
+
+    scannerRunning = true;
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+});
+</script>
+
+<style>
+.qr-scan-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.qr-scan-card {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.qr-scan-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.qr-scanner-area {
+    background: #f8f9ff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+#qr-reader {
+    width: 100% !important;
+}
+
+#qr-reader > video {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 8px;
+}
+
+.qr-status {
+    margin-top: 15px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.qr-instructions {
+    background: #f0f7ff;
+    border-left: 4px solid #667eea;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.qr-instructions ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+.qr-instructions li {
+    margin-bottom: 10px;
+}
+
+.qr-instructions li:last-child {
+    margin-bottom: 0;
+}
+
+.qr-actions {
+    text-align: center;
+}
+
+.qr-actions .btn {
+    padding: 12px 30px;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
