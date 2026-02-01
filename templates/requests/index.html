@@ -1,0 +1,141 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Yêu cầu của tôi{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1300px;">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-inboxes"></i> Yêu cầu của tôi</h2>
+            <div class="text-muted">Gửi yêu cầu và theo dõi trạng thái</div>
+        </div>
+        <div class="d-flex gap-2">
+            {% if session.get('role') == 'staff' %}
+            <a class="btn btn-outline-primary" href="{{ url_for('new_adjustment') }}">
+                <i class="bi bi-pencil-square"></i> Điều chỉnh công
+            </a>
+            <a class="btn btn-outline-primary" href="{{ url_for('new_schedule_change') }}">
+                <i class="bi bi-calendar2-plus"></i> Đề xuất lịch làm
+            </a>
+            {% endif %}
+            {% if session.get('role') in ['user', 'staff'] %}
+            <a class="btn btn-primary" href="{{ url_for('new_leave') }}">
+                <i class="bi bi-calendar2-x"></i> Xin nghỉ
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded-4 mb-4">
+        <div class="card-body">
+            <h3 class="fw-bold mb-3"><i class="bi bi-pencil-square"></i> Yêu cầu chỉnh sửa giờ công</h3>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Ngày</th>
+                            <th>Giờ vào yêu cầu</th>
+                            <th>Giờ ra yêu cầu</th>
+                            <th>Ghi chú</th>
+                            <th>Trạng thái</th>
+                            <th>Tạo lúc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in adjustments %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td>{{ r.work_date }}</td>
+                            <td>{{ r.requested_check_in }}</td>
+                            <td>{{ r.requested_check_out }}</td>
+                            <td class="text-start">{{ r.requested_note }}</td>
+                            <td><span class="badge bg-secondary">{{ r.status }}</span></td>
+                            <td>{{ r.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not adjustments %}
+                        <tr><td colspan="7" class="text-muted">Chưa có yêu cầu</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded-4">
+        <div class="card-body">
+            <h3 class="fw-bold mb-3"><i class="bi bi-calendar2-event"></i> Yêu cầu nghỉ phép</h3>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Từ</th>
+                            <th>Đến</th>
+                            <th>Lý do</th>
+                            <th>Trạng thái</th>
+                            <th>Tạo lúc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in leaves %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td>{{ r.start_date }}</td>
+                            <td>{{ r.end_date }}</td>
+                            <td class="text-start">{{ r.reason }}</td>
+                            <td><span class="badge bg-secondary">{{ r.status }}</span></td>
+                            <td>{{ r.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not leaves %}
+                        <tr><td colspan="6" class="text-muted">Chưa có yêu cầu</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if session.get('role') == 'staff' %}
+    <div class="card shadow-sm rounded-4 mt-4">
+        <div class="card-body">
+            <h3 class="fw-bold mb-3"><i class="bi bi-calendar2-plus"></i> Đề xuất lịch làm</h3>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Ngày</th>
+                            <th>Ca đề xuất</th>
+                            <th>Ghi chú</th>
+                            <th>Trạng thái</th>
+                            <th>Ghi chú admin</th>
+                            <th>Tạo lúc</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in schedule_changes %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td>{{ r.work_date }}</td>
+                            <td class="text-start">{{ r.requested_shift }}</td>
+                            <td class="text-start">{{ r.requested_note }}</td>
+                            <td><span class="badge bg-secondary">{{ r.status }}</span></td>
+                            <td class="text-start">{{ r.admin_note }}</td>
+                            <td>{{ r.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not schedule_changes %}
+                        <tr><td colspan="7" class="text-muted">Chưa có đề xuất lịch làm</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

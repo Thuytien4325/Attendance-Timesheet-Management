@@ -1,0 +1,151 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Duyệt yêu cầu{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1400px;">
+    <div class="card shadow-sm rounded-4 mb-4">
+        <div class="card-body">
+            <h2 class="fw-bold mb-3"><i class="bi bi-check2-square"></i> Duyệt yêu cầu chỉnh sửa giờ công</h2>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nhân viên</th>
+                            <th>Ngày</th>
+                            <th>Giờ vào</th>
+                            <th>Giờ ra</th>
+                            <th>Ghi chú</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in adjustments %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td class="text-start">
+                                <div class="fw-semibold">{{ r.full_name }}</div>
+                                <div class="text-muted small">@{{ r.username }} (ID: {{ r.user_id }})</div>
+                            </td>
+                            <td>{{ r.work_date }}</td>
+                            <td>{{ r.requested_check_in }}</td>
+                            <td>{{ r.requested_check_out }}</td>
+                            <td class="text-start">{{ r.requested_note }}</td>
+                            <td>
+                                <form class="d-flex gap-2 justify-content-center" method="POST" action="{{ url_for('approve_adjustment', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Ghi chú admin (tuỳ chọn)">
+                                    <button class="btn btn-success btn-sm" type="submit">Duyệt</button>
+                                </form>
+                                <form class="d-flex gap-2 justify-content-center mt-2" method="POST" action="{{ url_for('reject_adjustment', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Lý do từ chối (tuỳ chọn)">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not adjustments %}
+                        <tr><td colspan="7" class="text-muted">Không có yêu cầu chờ duyệt</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded-4">
+        <div class="card-body">
+            <h2 class="fw-bold mb-3"><i class="bi bi-calendar2-event"></i> Duyệt yêu cầu nghỉ phép</h2>
+            <div class="table-responsive mt-3">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nhân viên</th>
+                            <th>Từ</th>
+                            <th>Đến</th>
+                            <th>Lý do</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in leaves %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td class="text-start">
+                                <div class="fw-semibold">{{ r.full_name }}</div>
+                                <div class="text-muted small">@{{ r.username }} (ID: {{ r.user_id }})</div>
+                            </td>
+                            <td>{{ r.start_date }}</td>
+                            <td>{{ r.end_date }}</td>
+                            <td class="text-start">{{ r.reason }}</td>
+                            <td>
+                                <form class="d-flex gap-2 justify-content-center" method="POST" action="{{ url_for('approve_leave', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Ghi chú admin (tuỳ chọn)">
+                                    <button class="btn btn-success btn-sm" type="submit">Duyệt</button>
+                                </form>
+                                <form class="d-flex gap-2 justify-content-center mt-2" method="POST" action="{{ url_for('reject_leave', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Lý do từ chối (tuỳ chọn)">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not leaves %}
+                        <tr><td colspan="6" class="text-muted">Không có yêu cầu chờ duyệt</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded-4 mt-4">
+        <div class="card-body">
+            <h2 class="fw-bold mb-3"><i class="bi bi-calendar2-plus"></i> Duyệt đề xuất lịch làm</h2>
+            <div class="table-responsive mt-3">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nhân viên</th>
+                            <th>Ngày</th>
+                            <th>Ca đề xuất</th>
+                            <th>Ghi chú</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in schedule_changes %}
+                        <tr>
+                            <td>{{ r.request_id }}</td>
+                            <td class="text-start">
+                                <div class="fw-semibold">{{ r.full_name }}</div>
+                                <div class="text-muted small">@{{ r.username }} (ID: {{ r.user_id }})</div>
+                            </td>
+                            <td>{{ r.work_date }}</td>
+                            <td class="text-start">{{ r.requested_shift }}</td>
+                            <td class="text-start">{{ r.requested_note }}</td>
+                            <td>
+                                <form class="d-flex gap-2 justify-content-center" method="POST" action="{{ url_for('approve_schedule_change', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Ghi chú admin (tuỳ chọn)">
+                                    <button class="btn btn-success btn-sm" type="submit">Duyệt</button>
+                                </form>
+                                <form class="d-flex gap-2 justify-content-center mt-2" method="POST" action="{{ url_for('reject_schedule_change', request_id=r.request_id) }}">
+                                    <input class="form-control form-control-sm" name="admin_note" placeholder="Lý do từ chối (tuỳ chọn)">
+                                    <button class="btn btn-outline-danger btn-sm" type="submit">Từ chối</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not schedule_changes %}
+                        <tr><td colspan="6" class="text-muted">Không có đề xuất chờ duyệt</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

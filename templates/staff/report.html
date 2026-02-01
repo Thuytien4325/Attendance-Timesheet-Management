@@ -1,0 +1,94 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Báo cáo chấm công (Phòng ban){% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1300px;">
+    <div class="card shadow-sm rounded-4">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                <div>
+                    <h2 class="fw-bold mb-1"><i class="bi bi-clipboard2-data"></i> Báo cáo chấm công</h2>
+                    <div class="text-muted">Phạm vi: phòng ban của bạn • Xem theo khoảng ngày và xuất CSV</div>
+                </div>
+
+                <form class="d-flex gap-2" method="GET" action="{{ url_for('staff_report') }}">
+                    <input type="date" name="start" class="form-control" value="{{ start }}" required>
+                    <input type="date" name="end" class="form-control" value="{{ end }}" required>
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Lọc</button>
+                    <a class="btn btn-outline-primary" href="{{ url_for('staff_report_csv', start=start, end=end) }}">
+                        <i class="bi bi-download"></i> CSV
+                    </a>
+                </form>
+            </div>
+
+            <hr>
+
+            <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> Tổng giờ làm</h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>User ID</th>
+                            <th>Họ tên</th>
+                            <th>Tên đăng nhập</th>
+                            <th>Tổng giờ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in summary %}
+                        <tr>
+                            <td>{{ s.user_id }}</td>
+                            <td class="text-start">{{ s.full_name }}</td>
+                            <td>{{ s.username }}</td>
+                            <td><span class="badge bg-dark">{{ s.total_hours }}</span></td>
+                        </tr>
+                        {% endfor %}
+                        {% if not summary %}
+                        <tr><td colspan="4" class="text-muted">Không có dữ liệu</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="fw-bold mb-3"><i class="bi bi-list-check"></i> Chi tiết</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Nhân viên</th>
+                            <th>Phòng ban</th>
+                            <th>Ca</th>
+                            <th>Vào</th>
+                            <th>Ra</th>
+                            <th>Giờ làm</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr>
+                            <td>{{ r.work_date }}</td>
+                            <td class="text-start">
+                                <div class="fw-semibold">{{ r.full_name }}</div>
+                                <div class="text-muted small">@{{ r.username }} (ID: {{ r.user_id }})</div>
+                            </td>
+                            <td>{{ r.dept_name }}</td>
+                            <td>{{ r.shift_name }}</td>
+                            <td><span class="badge bg-success">{{ r.check_in }}</span></td>
+                            <td><span class="badge bg-warning text-dark">{{ r.check_out }}</span></td>
+                            <td><span class="badge bg-dark">{{ r.worked_hours }}</span></td>
+                            <td><span class="badge bg-secondary">{{ r.status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                        {% if not rows %}
+                        <tr><td colspan="8" class="text-muted">Không có dữ liệu</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

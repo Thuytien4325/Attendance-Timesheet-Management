@@ -1,0 +1,6 @@
+{
+  "users": [
+    {"full_name": "Admin Demo", "username": "admin", "role": "admin"},
+    {"full_name": "Nguyễn Văn A", "username": "nguyenvana", "role": "staff"}
+  ]
+}

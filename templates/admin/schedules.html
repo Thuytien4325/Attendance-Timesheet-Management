@@ -1,0 +1,128 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Phân ca / Lịch làm việc{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1300px;">
+    <div class="card shadow-sm rounded-4">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                <div>
+                    <h2 class="fw-bold mb-1"><i class="bi bi-calendar2-week"></i> Phân ca / Lịch làm việc</h2>
+                    <div class="text-muted">Gán ca làm theo ngày cho từng nhân viên</div>
+                </div>
+
+                <form class="d-flex gap-2" method="GET" action="{{ url_for('admin_schedules') }}">
+                    <input type="date" name="start" class="form-control" value="{{ start }}" required>
+                    <input type="date" name="end" class="form-control" value="{{ end }}" required>
+                    <select class="form-select" name="user_id" style="min-width: 220px;">
+                        <option value="">-- Tất cả nhân viên --</option>
+                        {% for u in users %}
+                            <option value="{{ u.user_id }}" {% if selected_user_id and selected_user_id == u.user_id %}selected{% endif %}>
+                                {{ u.full_name }} (@{{ u.username }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-search"></i> Lọc
+                    </button>
+                </form>
+            </div>
+
+            <hr>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="card border-0 bg-light rounded-4">
+                        <div class="card-body">
+                            <h5 class="fw-bold mb-3"><i class="bi bi-plus-circle"></i> Phân ca mới</h5>
+
+                            <form method="POST" action="{{ url_for('admin_schedules', start=start, end=end, user_id=selected_user_id or '') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                                <div class="mb-3">
+                                    <label class="form-label">Nhân viên</label>
+                                    <select class="form-select" name="user_id" required>
+                                        <option value="" disabled selected>-- Chọn nhân viên --</option>
+                                        {% for u in users %}
+                                            <option value="{{ u.user_id }}">{{ u.full_name }} (@{{ u.username }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ngày làm việc</label>
+                                    <input class="form-control" type="date" name="work_date" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ca làm</label>
+                                    <select class="form-select" name="shift_id" required>
+                                        <option value="" disabled selected>-- Chọn ca --</option>
+                                        {% for s in shifts %}
+                                            <option value="{{ s.shift_id }}">{{ s.shift_name }} ({{ s.start_time }} - {{ s.end_time }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ghi chú</label>
+                                    <input class="form-control" type="text" name="note" placeholder="VD: hỗ trợ ca chiều">
+                                </div>
+
+                                <button class="btn btn-success w-100" type="submit">
+                                    <i class="bi bi-check-circle"></i> Lưu phân ca
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-list-check"></i> Danh sách phân ca</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle text-center">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Ngày</th>
+                                    <th>Nhân viên</th>
+                                    <th>Ca</th>
+                                    <th>Ghi chú</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in schedules %}
+                                <tr>
+                                    <td>{{ r.work_date }}</td>
+                                    <td class="text-start">
+                                        <div class="fw-semibold">{{ r.full_name }}</div>
+                                        <div class="text-muted small">@{{ r.username }} (ID: {{ r.user_id }})</div>
+                                    </td>
+                                    <td><span class="badge bg-dark">{{ r.shift }}</span></td>
+                                    <td class="text-start">{{ r.note }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('admin_schedules_delete', schedule_id=r.schedule_id) }}" onsubmit="return confirm('Xóa lịch này?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not schedules %}
+                                <tr><td colspan="5" class="text-muted">Không có dữ liệu</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="text-muted small">Gợi ý: Nếu đã phân ca theo ngày, hệ thống sẽ dùng ca đó để xác định đi muộn/về sớm và tính giờ làm trong báo cáo.</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

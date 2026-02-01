@@ -1,0 +1,43 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Gửi yêu cầu xin nghỉ{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+    <div class="card shadow-sm rounded-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="fw-bold mb-0"><i class="bi bi-calendar2-x"></i> Xin nghỉ</h2>
+                <a class="btn btn-outline-secondary" href="{{ url_for('my_requests') }}">
+                    <i class="bi bi-arrow-left"></i> Quay lại
+                </a>
+            </div>
+
+            <form method="POST" action="{{ url_for('new_leave') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Từ ngày</label>
+                        <input type="date" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Đến ngày</label>
+                        <input type="date" class="form-control" name="end_date" required>
+                    </div>
+                </div>
+
+                <div class="mb-3 mt-3">
+                    <label class="form-label">Lý do</label>
+                    <textarea class="form-control" name="reason" rows="3" required></textarea>
+                </div>
+
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-send"></i> Gửi yêu cầu
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
