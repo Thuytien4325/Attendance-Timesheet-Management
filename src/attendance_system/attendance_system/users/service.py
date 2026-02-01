@@ -119,14 +119,8 @@ class UserService:
         )
 
     def create_user(self, *, full_name: str, username: str, password: str, dept_id: int, shift_id: int) -> int:
-        return self.create_account(
-            full_name=full_name,
-            username=username,
-            password=password,
-            role=Role.USER,
-            dept_id=dept_id,
-            shift_id=shift_id,
-        )
+        # Backward-compatible alias: the system no longer supports Role.USER.
+        return self.create_staff(full_name=full_name, username=username, password=password, dept_id=dept_id, shift_id=shift_id)
 
     def create_staff(self, *, full_name: str, username: str, password: str, dept_id: int, shift_id: int) -> int:
         return self.create_account(
@@ -153,3 +147,16 @@ class UserService:
 
         if not self._users.delete_by_id(user_id):
             raise ValidationError("Xóa nhân viên thất bại")
+
+    def activate_user(self, *, current_role: Role, user_id: int) -> None:
+        if current_role != Role.ADMIN:
+            raise AuthorizationError("Bạn không có quyền")
+
+        user = self._users.get_by_id(user_id)
+        if not user:
+            raise ValidationError("Nhân viên không tồn tại")
+        if user.role == Role.ADMIN:
+            raise ValidationError("Không thể thao tác tài khoản Admin")
+
+        if not self._users.set_active(user_id, is_active=True):
+            raise ValidationError("Kích hoạt lại thất bại")

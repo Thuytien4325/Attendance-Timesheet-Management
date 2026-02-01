@@ -7,7 +7,6 @@ class Role(str, Enum):
     """Vai trò người dùng dùng cho phân quyền."""
 
     ADMIN = "admin"
-    USER = "user"
     STAFF = "staff"
 
 

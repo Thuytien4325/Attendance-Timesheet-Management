@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(120) NOT NULL,
     username VARCHAR(50) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'user', 'staff') NOT NULL DEFAULT 'user',
+    role ENUM('admin', 'staff') NOT NULL DEFAULT 'staff',
     dept_id INT NULL,
     shift_id INT NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT fk_users_shift FOREIGN KEY (shift_id) REFERENCES shifts(shift_id)
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+-- Backward-compatible migration (older schema had role='user')
+UPDATE users SET role='staff' WHERE role='user';
+ALTER TABLE users MODIFY role ENUM('admin', 'staff') NOT NULL DEFAULT 'staff';
 
 -- ====== SCHEDULES (PER-DAY SHIFT ASSIGNMENT) ======
 CREATE TABLE IF NOT EXISTS schedules (

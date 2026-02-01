@@ -1,78 +1,151 @@
-// Xử lý xóa nhân viên bằng POST request với fetch API
-document.addEventListener('DOMContentLoaded', function() {
-    // Lắng nghe sự kiện click trên các nút xóa
-    const deleteButtons = document.querySelectorAll('.btn-delete-user');
-    
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const userId = this.getAttribute('data-user-id');
-            const userName = this.getAttribute('data-user-name');
-            const buttonElement = this;
-            
-            if (confirm(`Bạn có chắc chắn muốn xóa nhân viên "${userName}"?`)) {
-                // Vô hiệu hóa nút trong khi xử lý
-                buttonElement.disabled = true;
-                buttonElement.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xóa...';
-                
-                // Gửi POST request bằng fetch API
-                fetch(`/admin/user/delete/${userId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Hiển thị thông báo thành công
-                        const alertDiv = document.createElement('div');
-                        alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                        alertDiv.innerHTML = `
-                            <i class="bi bi-check-circle-fill me-2"></i>${data.message || 'Xóa nhân viên thành công!'}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        `;
-                        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
-                        
-                        // Xóa dòng khỏi bảng
-                        buttonElement.closest('tr').remove();
-                        
-                        // Reload trang sau 1 giây để cập nhật danh sách
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    } else {
-                        // Hiển thị thông báo lỗi
-                        const alertDiv = document.createElement('div');
-                        alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                        alertDiv.innerHTML = `
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>${data.message || 'Có lỗi xảy ra khi xóa nhân viên!'}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        `;
-                        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
-                        
-                        // Khôi phục nút
-                        buttonElement.disabled = false;
-                        buttonElement.innerHTML = '<i class="bi bi-trash-fill"></i> Xóa';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                    alertDiv.innerHTML = `
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Có lỗi xảy ra khi xóa nhân viên!
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    `;
-                    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
-                    
-                    // Khôi phục nút
-                    buttonElement.disabled = false;
-                    buttonElement.innerHTML = '<i class="bi bi-trash-fill"></i> Xóa';
-                });
-            }
-        });
-    });
-});
+// Xử lý vô hiệu hóa/kích hoạt lại nhân viên bằng fetch API
+document.addEventListener("DOMContentLoaded", function () {
+  function showAlert(type, message) {
+    const alertDiv = document.createElement("div");
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+            <i class="bi ${type === "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2"></i>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+    document
+      .querySelector(".container")
+      .insertBefore(alertDiv, document.querySelector(".container").firstChild);
+  }
 
+  function updateStatus(row, isActive) {
+    const statusBadge = row.querySelector("td:nth-last-child(2) .badge");
+    if (!statusBadge) return;
+    if (isActive) {
+      statusBadge.className = "badge bg-success";
+      statusBadge.textContent = "Active";
+    } else {
+      statusBadge.className = "badge bg-secondary";
+      statusBadge.textContent = "Inactive";
+    }
+  }
+
+  function replaceActionButton(row, isActive, userId, userName) {
+    const actionCell = row.querySelector("td:last-child");
+    if (!actionCell) return;
+
+    if (isActive) {
+      actionCell.innerHTML = `
+                <button type="button" class="btn btn-sm btn-danger btn-deactivate-user" data-user-id="${userId}" data-user-name="${userName}">
+                    <i class="bi bi-person-x-fill"></i> Vô hiệu hóa
+                </button>
+            `;
+    } else {
+      actionCell.innerHTML = `
+                <button type="button" class="btn btn-sm btn-success btn-activate-user" data-user-id="${userId}" data-user-name="${userName}">
+                    <i class="bi bi-person-check-fill"></i> Kích hoạt lại
+                </button>
+            `;
+    }
+
+    // Re-bind events for the newly injected button
+    bindRowButtons(row);
+  }
+
+  function postJson(url, payload) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload || {}),
+    }).then((r) => r.json());
+  }
+
+  function bindRowButtons(root) {
+    const scope = root || document;
+
+    scope.querySelectorAll(".btn-deactivate-user").forEach((button) => {
+      button.addEventListener("click", function (e) {
+        e.preventDefault();
+        const userId = this.getAttribute("data-user-id");
+        const userName = this.getAttribute("data-user-name");
+        const buttonElement = this;
+        if (
+          !confirm(
+            `Bạn có chắc chắn muốn vô hiệu hóa tài khoản của "${userName}"?`,
+          )
+        )
+          return;
+
+        buttonElement.disabled = true;
+        buttonElement.innerHTML =
+          '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
+
+        postJson(`/admin/users/delete/${userId}`, {})
+          .then((data) => {
+            if (data.success) {
+              showAlert("success", data.message || "Đã vô hiệu hóa tài khoản!");
+              const row = buttonElement.closest("tr");
+              updateStatus(row, false);
+              replaceActionButton(row, false, userId, userName);
+            } else {
+              showAlert(
+                "danger",
+                data.message || "Có lỗi xảy ra khi vô hiệu hóa nhân viên!",
+              );
+              buttonElement.disabled = false;
+              buttonElement.innerHTML =
+                '<i class="bi bi-person-x-fill"></i> Vô hiệu hóa';
+            }
+          })
+          .catch((err) => {
+            console.error("Error:", err);
+            showAlert("danger", "Có lỗi xảy ra khi vô hiệu hóa nhân viên!");
+            buttonElement.disabled = false;
+            buttonElement.innerHTML =
+              '<i class="bi bi-person-x-fill"></i> Vô hiệu hóa';
+          });
+      });
+    });
+
+    scope.querySelectorAll(".btn-activate-user").forEach((button) => {
+      button.addEventListener("click", function (e) {
+        e.preventDefault();
+        const userId = this.getAttribute("data-user-id");
+        const userName = this.getAttribute("data-user-name");
+        const buttonElement = this;
+        if (!confirm(`Kích hoạt lại tài khoản của "${userName}"?`)) return;
+
+        buttonElement.disabled = true;
+        buttonElement.innerHTML =
+          '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
+
+        postJson(`/admin/users/activate/${userId}`, {})
+          .then((data) => {
+            if (data.success) {
+              showAlert(
+                "success",
+                data.message || "Đã kích hoạt lại tài khoản!",
+              );
+              const row = buttonElement.closest("tr");
+              updateStatus(row, true);
+              replaceActionButton(row, true, userId, userName);
+            } else {
+              showAlert(
+                "danger",
+                data.message || "Có lỗi xảy ra khi kích hoạt lại!",
+              );
+              buttonElement.disabled = false;
+              buttonElement.innerHTML =
+                '<i class="bi bi-person-check-fill"></i> Kích hoạt lại';
+            }
+          })
+          .catch((err) => {
+            console.error("Error:", err);
+            showAlert("danger", "Có lỗi xảy ra khi kích hoạt lại!");
+            buttonElement.disabled = false;
+            buttonElement.innerHTML =
+              '<i class="bi bi-person-check-fill"></i> Kích hoạt lại';
+          });
+      });
+    });
+  }
+
+  bindRowButtons(document);
+});

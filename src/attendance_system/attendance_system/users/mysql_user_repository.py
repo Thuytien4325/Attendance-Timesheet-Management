@@ -26,12 +26,16 @@ class MySQLUserRepository(UserRepository):
             row = fetchone(cur)
             if not row:
                 return None
+            try:
+                role = Role(row["role"])
+            except Exception:
+                role = Role.STAFF
             return User(
                 user_id=int(row["user_id"]),
                 full_name=row["full_name"],
                 username=row["username"],
                 password_hash=row["password_hash"],
-                role=Role(row["role"]),
+                role=role,
                 dept_id=row.get("dept_id"),
                 shift_id=row.get("shift_id"),
                 is_active=bool(row.get("is_active", True)),
@@ -50,12 +54,16 @@ class MySQLUserRepository(UserRepository):
             row = fetchone(cur)
             if not row:
                 return None
+            try:
+                role = Role(row["role"])
+            except Exception:
+                role = Role.STAFF
             return User(
                 user_id=int(row["user_id"]),
                 full_name=row["full_name"],
                 username=row["username"],
                 password_hash=row["password_hash"],
-                role=Role(row["role"]),
+                role=role,
                 dept_id=row.get("dept_id"),
                 shift_id=row.get("shift_id"),
                 is_active=bool(row.get("is_active", True)),
@@ -83,14 +91,19 @@ class MySQLUserRepository(UserRepository):
 
     def delete_by_id(self, user_id: int) -> bool:
         with db_cursor(self._conn_factory) as (_, cur):
-            cur.execute("DELETE FROM users WHERE user_id=%s", (user_id,))
+            cur.execute("UPDATE users SET is_active=0 WHERE user_id=%s", (user_id,))
+            return cur.rowcount > 0
+
+    def set_active(self, user_id: int, *, is_active: bool) -> bool:
+        with db_cursor(self._conn_factory) as (_, cur):
+            cur.execute("UPDATE users SET is_active=%s WHERE user_id=%s", (1 if is_active else 0, user_id))
             return cur.rowcount > 0
 
     def list_admin_view(self) -> Sequence[dict]:
         with db_cursor(self._conn_factory) as (_, cur):
             cur.execute(
                 """
-                SELECT u.user_id, u.full_name, u.username, u.role,
+                SELECT u.user_id, u.full_name, u.username, u.role, u.is_active,
                        d.dept_name,
                        s.shift_name, s.start_time, s.end_time
                 FROM users u
@@ -102,14 +115,19 @@ class MySQLUserRepository(UserRepository):
             rows = fetchall(cur)
             out: list[dict] = []
             for r in rows:
+                role = r.get("role")
+                if role not in {Role.ADMIN.value, Role.STAFF.value}:
+                    role = Role.STAFF.value
                 out.append(
                     {
                         "user_id": r["user_id"],
                         "full_name": r["full_name"],
                         "username": r["username"],
-                        "role": r["role"],
+                        "role": role,
+                        "is_active": bool(r.get("is_active", True)),
                         "dept_name": r.get("dept_name") or "-",
-                        "shift": (
+                        # Template expects `shift_name`.
+                        "shift_name": (
                             f"{r.get('shift_name')} ({str(r.get('start_time'))[:5]}-{str(r.get('end_time'))[:5]})"
                             if r.get("shift_name")
                             else "-"

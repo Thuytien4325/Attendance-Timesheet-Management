@@ -1,76 +1,91 @@
-{% extends "layouts/dashboard_base.html" %}
+{% extends "layouts/dashboard_base.html" %} {% block title %}Quản lý nhân viên{%
+endblock %} {% block content %}
+<div class="container py-4" style="max-width: 1200px">
+  <div class="text-center mb-4">
+    <div class="display-6 text-primary"><i class="bi bi-people-fill"></i></div>
+    <h2 class="fw-bold mt-2">Quản lý nhân viên</h2>
+    <p class="text-muted">Danh sách toàn bộ nhân viên trong công ty</p>
+  </div>
 
-{% block title %}Quản lý nhân viên{% endblock %}
+  <div class="card shadow-sm rounded-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-end mb-3">
+        <a href="{{ url_for('add_user') }}" class="btn btn-success">
+          <i class="bi bi-person-plus-fill me-1"></i> Thêm nhân viên
+        </a>
+      </div>
 
-{% block content %}
-<div class="container py-4" style="max-width: 1200px;">
-    <div class="text-center mb-4">
-        <div class="display-6 text-primary"><i class="bi bi-people-fill"></i></div>
-        <h2 class="fw-bold mt-2">Quản lý nhân viên</h2>
-        <p class="text-muted">Danh sách toàn bộ nhân viên trong công ty</p>
-    </div>
-
-    <div class="card shadow-sm rounded-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-end mb-3">
-                <a href="{{ url_for('add_user') }}" class="btn btn-success">
-                    <i class="bi bi-person-plus-fill me-1"></i> Thêm nhân viên
-                </a>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-hover align-middle text-center">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>#</th>
-                            <th>Họ tên</th>
-                            <th>Tên đăng nhập</th>
-                            <th>Phòng ban</th>
-                            <th>Ca làm việc</th>
-                            <th>Quyền</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
-                            <td>{{ loop.index }}</td>
-                            <td>{{ user.full_name }}</td>
-                            <td>{{ user.username }}</td>
-                            <td>{{ user.dept_name }}</td>
-                            <td>{{ user.shift_name }}</td>
-                            <td>
-                                {% if user.role == 'admin' %}
-                                    <span class="badge bg-danger">Admin</span>
-                                {% elif user.role == 'staff' %}
-                                    <span class="badge bg-primary">Staff</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">User</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user.role != 'admin' %}
-                                <button type="button" class="btn btn-sm btn-danger btn-delete-user" data-user-id="{{ user.user_id }}" data-user-name="{{ user.full_name }}">
-                                    <i class="bi bi-trash-fill"></i> Xóa
-                                </button>
-                                {% else %}
-                                <span class="text-muted fst-italic">Không thể xóa</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-
-                {% if not users %}
-                    <div class="text-center text-muted py-3">Không có nhân viên nào</div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle text-center">
+          <thead class="table-primary">
+            <tr>
+              <th>#</th>
+              <th>Họ tên</th>
+              <th>Tên đăng nhập</th>
+              <th>Phòng ban</th>
+              <th>Ca làm việc</th>
+              <th>Quyền</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ user.full_name }}</td>
+              <td>{{ user.username }}</td>
+              <td>{{ user.dept_name }}</td>
+              <td>{{ user.shift_name }}</td>
+              <td>
+                {% if user.role == 'admin' %}
+                <span class="badge bg-danger">Admin</span>
+                {% elif user.role == 'staff' %}
+                <span class="badge bg-primary">Staff</span>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+              </td>
+              <td>
+                {% if user.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if user.role != 'admin' %} {% if user.is_active %}
+                <button
+                  type="button"
+                  class="btn btn-sm btn-danger btn-deactivate-user"
+                  data-user-id="{{ user.user_id }}"
+                  data-user-name="{{ user.full_name }}"
+                >
+                  <i class="bi bi-person-x-fill"></i> Vô hiệu hóa
+                </button>
+                {% else %}
+                <button
+                  type="button"
+                  class="btn btn-sm btn-success btn-activate-user"
+                  data-user-id="{{ user.user_id }}"
+                  data-user-name="{{ user.full_name }}"
+                >
+                  <i class="bi bi-person-check-fill"></i> Kích hoạt lại
+                </button>
+                {% endif %} {% else %}
+                <span class="text-muted fst-italic">Không thể thao tác</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
 
-{% block scripts %}
+        {% if not users %}
+        <div class="text-center text-muted py-3">Không có nhân viên nào</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
 <script src="{{ url_for('static', filename='js/admin_users.js') }}"></script>
 {% endblock %}

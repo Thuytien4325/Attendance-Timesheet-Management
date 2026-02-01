@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 import traceback
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 
 from ..core.enums import Role
 from ..core.exceptions import AuthenticationError, AuthorizationError, ValidationError
@@ -94,7 +94,7 @@ def register(app: Flask, container: Container) -> None:
                 full_name = request.form.get("fullName", "")
                 username = request.form.get("username", "")
                 password = request.form.get("password", "")
-                role_s = request.form.get("role", "user")
+                role_s = request.form.get("role", Role.STAFF.value)
                 dept_id = int(request.form.get("department") or 0)
                 shift_id = int(request.form.get("shift") or 0)
 
@@ -133,10 +133,35 @@ def register(app: Flask, container: Container) -> None:
     def delete_user(user_id: int):
         try:
             container.user_service.delete_user(current_role=Role(session.get("role")), user_id=user_id)
-            flash("Đã xóa nhân viên.", "success")
+            if request.is_json:
+                return jsonify({"success": True, "message": "Đã vô hiệu hóa tài khoản."})
+            flash("Đã vô hiệu hóa tài khoản.", "success")
         except (ValidationError, AuthorizationError) as e:
+            if request.is_json:
+                return jsonify({"success": False, "message": str(e)}), 400
             flash(str(e), "danger")
         except Exception:
+            if request.is_json:
+                return jsonify({"success": False, "message": "Lỗi hệ thống khi vô hiệu hóa nhân viên"}), 500
             flash("Lỗi hệ thống khi xóa nhân viên", "danger")
+
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/activate/<int:user_id>", methods=["POST"], endpoint="activate_user")
+    @admin_required
+    def activate_user(user_id: int):
+        try:
+            container.user_service.activate_user(current_role=Role(session.get("role")), user_id=user_id)
+            if request.is_json:
+                return jsonify({"success": True, "message": "Đã kích hoạt lại tài khoản."})
+            flash("Đã kích hoạt lại tài khoản.", "success")
+        except (ValidationError, AuthorizationError) as e:
+            if request.is_json:
+                return jsonify({"success": False, "message": str(e)}), 400
+            flash(str(e), "danger")
+        except Exception:
+            if request.is_json:
+                return jsonify({"success": False, "message": "Lỗi hệ thống khi kích hoạt lại"}), 500
+            flash("Lỗi hệ thống khi kích hoạt lại", "danger")
 
         return redirect(url_for("admin_users"))

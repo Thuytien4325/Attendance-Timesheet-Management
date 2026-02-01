@@ -88,12 +88,8 @@ def register(app: Flask, container: Container) -> None:
         return render_template("requests/new_adjustment.html", active_page="new_adjustment")
 
     @app.route("/requests/leaves/new", methods=["GET", "POST"], endpoint="new_leave")
-    @login_required
+    @staff_required
     def new_leave():
-        if session.get("role") not in {Role.USER.value, Role.STAFF.value}:
-            current_user = {"full_name": session.get("name"), "role": session.get("role")}
-            return render_template("403.html", current_user=current_user), 403
-
         if request.method == "POST":
             try:
                 start_date = _parse_date(request.form.get("start_date") or "")

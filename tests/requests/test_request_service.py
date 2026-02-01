@@ -169,7 +169,7 @@ def test_non_staff_cannot_create_adjustment():
     svc = RequestService(FakeRequestsRepo(), FakeAttendanceRepo(FakeAttendanceRecord()), FakeScheduleRepo())
     with pytest.raises(AuthorizationError):
         svc.create_timesheet_adjustment(
-            current_role=Role.USER,
+            current_role=Role.ADMIN,
             user_id=2,
             work_date=date(2026, 2, 1),
             requested_check_in="09:00",

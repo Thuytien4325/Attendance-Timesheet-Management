@@ -13,8 +13,11 @@ from pathlib import Path
 
 from config import get_settings_module
 
+from dotenv import load_dotenv
+
 
 def main() -> None:
+    load_dotenv(override=False)
     settings = importlib.import_module(get_settings_module())
     db = settings.DB_CONFIG
 

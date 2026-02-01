@@ -150,7 +150,7 @@ class RequestService:
         end_date: date,
         reason: str,
     ) -> int:
-        if current_role not in {Role.USER, Role.STAFF}:
+        if current_role != Role.STAFF:
             raise AuthorizationError("Bạn không có quyền")
 
         if end_date < start_date:

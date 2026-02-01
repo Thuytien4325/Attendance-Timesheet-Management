@@ -33,5 +33,8 @@ class UserRepository(Protocol):
     def delete_by_id(self, user_id: int) -> bool:
         raise NotImplementedError
 
+    def set_active(self, user_id: int, *, is_active: bool) -> bool:
+        raise NotImplementedError
+
     def list_admin_view(self) -> Sequence[dict]:
         raise NotImplementedError

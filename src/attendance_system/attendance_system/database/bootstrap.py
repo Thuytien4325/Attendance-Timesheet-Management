@@ -204,7 +204,9 @@ def ensure_demo_users(db_config: dict) -> None:
 
         upsert_user("Admin Demo", "admin", "admin123", "admin", dept_it, shift_hc)
         upsert_user("Nguyễn Văn A", "nguyenvana", "staff123", "staff", dept_hr, shift_cs)
-        upsert_user("User Demo", "userdemo", "user1234", "user", dept_it, shift_cs)
+
+        # Migrate any legacy 'user' roles to 'staff' (the system no longer supports role='user').
+        cur.execute("UPDATE users SET role='staff' WHERE role='user'")
 
         conn.commit()
     finally:
