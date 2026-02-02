@@ -7,7 +7,7 @@ class Config:
 
     # Cấu hình DB
     DB_USER = os.environ.get("DB_USER", "root")
-    DB_PASSWORD = os.environ.get("DB_PASSWORD", "12345")
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "123456")
     DB_HOST = os.environ.get("DB_HOST", os.environ.get("DB_HOST_ENV", "localhost"))
     DB_PORT = int(os.environ.get("DB_PORT", "3306"))
     DB_NAME = os.environ.get("DB_NAME", os.environ.get("DB_DATABASE", "attendance_db"))
@@ -24,14 +24,14 @@ class Config:
 # Compatibility with current app wiring (mysql-connector dict)
 SECRET_KEY = Config.SECRET_KEY
 DB_CONFIG = {
-    "host": Config.DB_HOST,
-    "port": Config.DB_PORT,
-    "user": Config.DB_USER,
-    "password": Config.DB_PASSWORD,
-    "database": Config.DB_NAME,
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "38632347tT@"),
+    "database": os.getenv("DB_NAME", "attendance_db"),
 }
 
-DEBUG = bool(int(os.environ.get("DEBUG", "1")))
+DEBUG = True
 
-AUTO_INIT_DB = Config.AUTO_INIT_DB
-AUTO_SEED_DB = Config.AUTO_SEED_DB
+AUTO_INIT_DB = True
+AUTO_SEED_DB = False

@@ -19,6 +19,33 @@
             <form action="{{ url_for('checkout') }}" method="POST">
                 <button class="btn btn-warning btn-action"><i class="fas fa-sign-out-alt me-2"></i> TAN CA</button>
             </form>
+            <button id="btn-qr-scan" class="btn btn-primary btn-action"><i class="fas fa-qrcode me-2"></i> QUÉT QR</button>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div class="modal fade" id="qrScannerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-qrcode me-2" style="color: #667eea;"></i>Quét Mã QR Chấm Công</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <video id="qr-video" style="width: 100%; max-width: 400px; height: 300px; border-radius: 8px; object-fit: cover; display: none; background: #000;"></video>
+                    <div id="qr-placeholder" style="width: 100%; height: 300px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center;">
+                            <i class="fas fa-camera" style="font-size: 2.5rem; color: #667eea; margin-bottom: 10px;"></i>
+                            <p style="color: #999; margin-top: 10px;">Đang khởi động camera...</p>
+                        </div>
+                    </div>
+                    <div id="qr-result" class="alert mt-3" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-stop-scan" class="btn btn-secondary" style="display: none;">Dừng Quét</button>
+                    <input type="text" id="qr-code-input" class="form-control" placeholder="Hoặc dán mã QR tại đây..." style="max-width: 250px;">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -54,4 +81,155 @@
         </div>
     </div>
 </div>
+
+<!-- QR Code Library -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let isQRScanning = false;
+    let videoStream = null;
+
+    const btnQRScan = document.getElementById('btn-qr-scan');
+    const qrScannerModal = new bootstrap.Modal(document.getElementById('qrScannerModal'));
+    const stopQRScanBtn = document.getElementById('btn-stop-scan');
+    const qrResultDiv = document.getElementById('qr-result');
+    const qrVideoElement = document.getElementById('qr-video');
+    const qrPlaceholder = document.getElementById('qr-placeholder');
+    const qrCodeInput = document.getElementById('qr-code-input');
+
+    // Open QR Scanner Modal
+    btnQRScan.addEventListener('click', function(e) {
+        e.preventDefault();
+        qrScannerModal.show();
+        startQRScanning();
+    });
+
+    // Start QR Scanning
+    async function startQRScanning() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            
+            videoStream = stream;
+            qrVideoElement.srcObject = stream;
+            isQRScanning = true;
+
+            qrPlaceholder.style.display = 'none';
+            qrVideoElement.style.display = 'block';
+            stopQRScanBtn.style.display = 'inline-block';
+            qrResultDiv.style.display = 'none';
+
+            scanQRCode();
+        } catch (error) {
+            qrPlaceholder.innerHTML = '<div style="text-align: center;"><i class="fas fa-camera-slash" style="font-size: 2.5rem; color: #dc3545; margin-bottom: 10px;"></i><p style="color: #dc3545;">Không thể truy cập camera</p><p style="color: #999; font-size: 0.9rem;">' + error.message + '</p></div>';
+        }
+    }
+
+    // Stop QR Scanning
+    stopQRScanBtn.addEventListener('click', function() {
+        stopScanning();
+    });
+
+    // QR Code Scanning Function
+    function scanQRCode() {
+        if (!isQRScanning) return;
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        canvas.width = qrVideoElement.videoWidth;
+        canvas.height = qrVideoElement.videoHeight;
+
+        if (canvas.width && canvas.height) {
+            context.drawImage(qrVideoElement, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                processQRCode(code.data);
+                return;
+            }
+        }
+        
+        requestAnimationFrame(scanQRCode);
+    }
+
+    // Process QR Code
+    function processQRCode(qrData) {
+        console.log('QR Code detected:', qrData);
+        
+        qrResultDiv.style.display = 'block';
+        qrResultDiv.innerHTML = '<strong>✓ Mã QR phát hiện:</strong> ' + qrData;
+        qrResultDiv.className = 'alert alert-success';
+
+        stopScanning();
+        submitQRCheckInOut(qrData);
+    }
+
+    // Stop Scanning Helper
+    function stopScanning() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+        isQRScanning = false;
+        qrVideoElement.srcObject = null;
+        
+        qrPlaceholder.style.display = 'flex';
+        qrPlaceholder.innerHTML = '<div style="text-align: center;"><i class="fas fa-camera" style="font-size: 2.5rem; color: #667eea; margin-bottom: 10px;"></i><p style="color: #999; margin-top: 10px;">Camera đã dừng</p></div>';
+        qrVideoElement.style.display = 'none';
+        stopQRScanBtn.style.display = 'none';
+    }
+
+    // Handle QR Code Input Fallback
+    qrCodeInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const qrData = this.value.trim();
+            if (qrData) {
+                stopScanning();
+                processQRCode(qrData);
+                this.value = '';
+            }
+        }
+    });
+
+    // Modal close event
+    document.getElementById('qrScannerModal').addEventListener('hidden.bs.modal', function() {
+        stopScanning();
+        qrResultDiv.style.display = 'none';
+        qrCodeInput.value = '';
+    });
+
+    // Submit QR Check-in/Check-out via AJAX
+    function submitQRCheckInOut(qrData) {
+        // Auto-detect: check if user has check-in today
+        // If yes, next scan is checkout; if no, it's check-in
+        fetch('/api/checkin/qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qr_code: qrData })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                qrResultDiv.className = 'alert alert-success';
+                const action = data.action || 'Chấm công';
+                qrResultDiv.innerHTML = '<strong>✓ ' + action + ' thành công!</strong><br>' + (data.message || '');
+                setTimeout(() => {
+                    qrScannerModal.hide();
+                    location.reload();
+                }, 2000);
+            } else {
+                qrResultDiv.className = 'alert alert-danger';
+                qrResultDiv.innerHTML = '<strong>✗ Lỗi:</strong> ' + (data.message || 'Chấm công không thành công');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            qrResultDiv.className = 'alert alert-danger';
+            qrResultDiv.innerHTML = '<strong>✗ Lỗi kết nối:</strong> ' + error.message;
+        });
+    }
+});
+</script>
 {% endblock %}

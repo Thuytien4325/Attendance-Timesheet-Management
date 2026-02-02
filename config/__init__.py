@@ -1,14 +1,12 @@
 import os
 
 
-def get_settings_module() -> str:
+def get_settings_module():
     env = os.getenv("APP_ENV", "development").lower()
-    if env in {"config", "settings"}:
+
+    if env == "production":
         return "config.config"
-    if env in {"dev", "development"}:
-        return "config.development"
-    if env in {"prod", "production"}:
-        return "config.production"
-    if env in {"test", "testing"}:
-        return "config.testing"
-    return "config.development"
+    elif env == "test":
+        return "config.config"
+    else:
+        return "config.config"

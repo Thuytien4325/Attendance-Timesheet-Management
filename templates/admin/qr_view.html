@@ -1,0 +1,160 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Quản lý Mã QR Chấm Công - Hệ thống Chấm Công{% endblock %}
+
+{% block content %}
+<div class="qr-admin-container">
+    <div class="qr-admin-card">
+        <div class="qr-admin-header">
+            <h3 class="fw-bold" style="color: #2c3e50;">
+                <i class="fas fa-qrcode" style="color: #667eea; margin-right: 10px;"></i>
+                Quản Lý Mã QR Chấm Công
+            </h3>
+            <p class="text-muted">In mã QR để dán tại cửa văn phòng</p>
+        </div>
+
+        <div class="qr-content">
+            <div class="qr-display-area">
+                <div class="qr-image-wrapper">
+                    <img id="qr-image" src="{{ url_for('admin_qr_image') }}" alt="QR Code" width="300" height="300" style="border: 3px solid #667eea; padding: 15px; border-radius: 10px;">
+                </div>
+            </div>
+
+            <div class="qr-info mt-4">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Hướng dẫn:</strong>
+                    <ul style="margin-bottom: 0; margin-top: 10px;">
+                        <li>Mã QR này cho phép tất cả nhân viên chấm công</li>
+                        <li>In mã QR này và dán tại cửa văn phòng hoặc điểm chấm công</li>
+                        <li>Nhân viên quét mã QR để tự động check-in hoặc check-out</li>
+                        <li>Hệ thống sẽ tự động xác định check-in lần 1 hay check-out lần 2</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="qr-actions mt-4">
+                <button type="button" class="btn btn-primary" onclick="printQR()">
+                    <i class="fas fa-print me-2"></i> In Mã QR
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="downloadQR()">
+                    <i class="fas fa-download me-2"></i> Tải Ảnh
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i> Quay Lại
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Preview -->
+    <div id="print-area" style="display: none;">
+        <div style="text-align: center; padding: 40px;">
+            <h2>Mã QR Chấm Công</h2>
+            <p style="color: #666; margin-bottom: 30px;">Quét mã QR để chấm công</p>
+            <img id="print-qr" src="{{ url_for('admin_qr_image') }}" alt="QR Code" width="400" height="400" style="border: 3px solid #333; padding: 20px;">
+            <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                Vui lòng quét mã QR này để chấm công vào/ra<br>
+                Hệ thống sẽ tự động xác định thời điểm check-in hoặc check-out
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function printQR() {
+    const printArea = document.getElementById('print-area');
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = printArea.innerHTML;
+    window.print();
+    document.body.innerHTML = originalContent;
+    
+    // Re-attach event listeners
+    document.querySelector('.btn-primary').onclick = printQR;
+    document.querySelector('.btn-secondary').onclick = downloadQR;
+}
+
+function downloadQR() {
+    const link = document.createElement('a');
+    link.href = "{{ url_for('admin_qr_image') }}";
+    link.download = 'qr-code-checkin.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+
+<style>
+.qr-admin-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.qr-admin-card {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.qr-admin-header {
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+
+.qr-display-area {
+    text-align: center;
+    padding: 30px;
+    background: linear-gradient(135deg, #f5f7ff 0%, #f0f3ff 100%);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.qr-image-wrapper {
+    display: inline-block;
+}
+
+.qr-image-wrapper img {
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.qr-image-wrapper img:hover {
+    transform: scale(1.05);
+}
+
+.qr-info {
+    background: #f0f7ff;
+    border-left: 4px solid #667eea;
+}
+
+.qr-info .alert {
+    margin-bottom: 0;
+    border-left: none;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.qr-actions .btn {
+    padding: 12px 25px;
+    font-weight: 600;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #print-area, #print-area * {
+        visibility: visible;
+    }
+}
+</style>
+{% endblock %}

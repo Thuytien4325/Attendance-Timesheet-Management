@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import io
 import csv
+import qrcode
 from datetime import date, datetime, timedelta
 from functools import wraps
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, send_file
 
 from ..core.enums import Role
 from ..core.exceptions import ValidationError
@@ -96,6 +97,61 @@ def register(app: Flask, container: Container) -> None:
         except Exception:
             flash("Lỗi hệ thống khi chấm công tan ca", "danger")
         return redirect(url_for("dashboard"))
+
+    @app.route("/api/checkin/qr", methods=["POST"], endpoint="api_checkin_qr")
+    @login_required
+    def api_checkin_qr():
+        """API endpoint for QR code check-in/checkout - auto-detect based on current status"""
+        try:
+            data = request.get_json()
+            qr_code = data.get("qr_code", "").strip()
+            
+            if not qr_code:
+                return jsonify({
+                    "success": False,
+                    "message": "Mã QR không được để trống"
+                }), 400
+            
+            user_id = int(session["user_id"])
+            today = date.today()
+            
+            # Check if user has already checked in today
+            attendance_record = container.attendance_service.get_today_record(user_id, today)
+            
+            if attendance_record and attendance_record.check_in_time and not attendance_record.check_out_time:
+                # User has checked in but not checked out -> this is checkout
+                try:
+                    container.attendance_service.check_out(user_id)
+                    return jsonify({
+                        "success": True,
+                        "action": "✓ Chấm công tan ca",
+                        "message": "Chấm công tan ca bằng QR thành công!"
+                    }), 200
+                except ValidationError as e:
+                    return jsonify({
+                        "success": False,
+                        "message": str(e)
+                    }), 400
+            else:
+                # User hasn't checked in or already checked out -> this is check-in
+                try:
+                    container.attendance_service.check_in(user_id)
+                    return jsonify({
+                        "success": True,
+                        "action": "✓ Chấm công vào ca",
+                        "message": "Chấm công vào ca bằng QR thành công!"
+                    }), 200
+                except ValidationError as e:
+                    return jsonify({
+                        "success": False,
+                        "message": str(e)
+                    }), 400
+            
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "message": "Lỗi hệ thống khi chấm công"
+            }), 500
 
     def _parse_date(value: str) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
@@ -272,3 +328,110 @@ def register(app: Flask, container: Container) -> None:
 
         filename = f"attendance_report_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
         return _write_report_csv(data=data, filename=filename)
+
+    # ===== QR CODE ENDPOINTS =====
+
+    @app.route("/admin/qr/view", endpoint="admin_qr_view")
+    @admin_required
+    def admin_qr_view():
+        """Admin page to view and print company QR code"""
+        return render_template("admin/qr_view.html", active_page="admin_qr")
+
+    @app.route("/admin/qr/image", endpoint="admin_qr_image")
+    @admin_required
+    def admin_qr_image():
+        """Generate and return company QR code image"""
+        try:
+            # Use a secure token for the QR code
+            # In production, you could use date-based token or database config
+            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(token_data)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+            
+            return send_file(buf, mimetype='image/png')
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
+
+    @app.route("/qr/scan", endpoint="qr_scan_page")
+    @login_required
+    def qr_scan_page():
+        """Page for staff to scan QR code"""
+        return render_template("qr_scan.html")
+
+    @app.route("/api/qr/checkin", methods=["POST"], endpoint="api_qr_checkin")
+    @login_required
+    def api_qr_checkin():
+        """API endpoint to handle QR code scanning for check-in/out"""
+        try:
+            data = request.get_json()
+            scanned_code = data.get("code", "").strip()
+
+            if not scanned_code:
+                return jsonify({
+                    "success": False,
+                    "message": "Mã QR không được để trống"
+                }), 400
+
+            # Verify QR code is valid
+            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            if scanned_code != token_data:
+                return jsonify({
+                    "success": False,
+                    "message": "Mã QR không hợp lệ hoặc hết hạn!"
+                }), 400
+
+            user_id = int(session["user_id"])
+            today = date.today()
+            
+            # Check if user has already checked in today
+            attendance_record = container.attendance_service.get_today_record(user_id, today)
+            
+            if attendance_record and attendance_record.check_in_time and not attendance_record.check_out_time:
+                # User has checked in but not checked out -> this is checkout
+                try:
+                    container.attendance_service.check_out(user_id)
+                    return jsonify({
+                        "success": True,
+                        "action": "tan_ca",
+                        "message": "✓ Chấm công tan ca thành công!"
+                    }), 200
+                except ValidationError as e:
+                    return jsonify({
+                        "success": False,
+                        "message": str(e)
+                    }), 400
+            else:
+                # User hasn't checked in or already checked out -> this is check-in
+                try:
+                    container.attendance_service.check_in(user_id)
+                    return jsonify({
+                        "success": True,
+                        "action": "vao_ca",
+                        "message": "✓ Chấm công vào ca thành công!"
+                    }), 200
+                except ValidationError as e:
+                    return jsonify({
+                        "success": False,
+                        "message": str(e)
+                    }), 400
+            
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "message": "Lỗi hệ thống khi chấm công"
+            }), 500
