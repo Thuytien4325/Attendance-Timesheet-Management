@@ -27,9 +27,16 @@
         </div>
 
         <div class="qr-actions mt-4">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left me-2"></i> Quay lại Dashboard
-            </a>
+            <div class="mb-2">
+                <label class="btn btn-outline-primary me-2">
+                    <i class="fas fa-image me-2"></i> Chọn ảnh
+                    <input type="file" id="qr-file-input" accept="image/*" hidden>
+                </label>
+                <button id="qr-upload-btn" class="btn btn-primary">Gửi ảnh</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary ms-2">
+                    <i class="fas fa-arrow-left me-2"></i> Quay lại Dashboard
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -103,6 +110,61 @@ document.addEventListener('DOMContentLoaded', function() {
 
     scannerRunning = true;
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+
+    // --- Image upload handling ---
+    const fileInput = document.getElementById('qr-file-input');
+    const uploadBtn = document.getElementById('qr-upload-btn');
+
+    function showStatus(html) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = html;
+    }
+
+    async function uploadImageFile(file) {
+        if (!file) return;
+
+        // Stop scanner while uploading
+        try { html5QrcodeScanner.clear(); } catch (e) {}
+
+        showStatus('<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Đang gửi ảnh...</div>');
+
+        const form = new FormData();
+        form.append('image', file);
+
+        try {
+            const resp = await fetch("{{ url_for('api_qr_checkin_image') }}", {
+                method: 'POST',
+                body: form
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                showStatus('<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ' + data.message + '</div>');
+                setTimeout(() => { window.location.href = "{{ url_for('dashboard') }}"; }, 1500);
+            } else {
+                showStatus('<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ' + (data.message || 'Lỗi khi xử lý ảnh') + '</div>');
+                // restart scanner after short delay
+                setTimeout(() => { html5QrcodeScanner.render(onScanSuccess, onScanFailure); }, 1200);
+            }
+        } catch (err) {
+            console.error(err);
+            showStatus('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i> Lỗi kết nối server!</div>');
+            setTimeout(() => { html5QrcodeScanner.render(onScanSuccess, onScanFailure); }, 1200);
+        }
+    }
+
+    fileInput.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) uploadImageFile(f);
+    });
+
+    uploadBtn.addEventListener('click', (e) => {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) {
+            fileInput.click();
+            return;
+        }
+        uploadImageFile(f);
+    });
 });
 </script>
 

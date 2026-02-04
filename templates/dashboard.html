@@ -43,7 +43,13 @@
                 </div>
                 <div class="modal-footer">
                     <button id="btn-stop-scan" class="btn btn-secondary" style="display: none;">Dừng Quét</button>
-                    <input type="text" id="qr-code-input" class="form-control" placeholder="Hoặc dán mã QR tại đây..." style="max-width: 250px;">
+                    <label class="btn btn-outline-primary me-2 mb-0">
+                        <i class="fas fa-image me-2"></i>
+                        Chọn ảnh
+                        <input type="file" id="qr-file-input" accept="image/*" hidden>
+                    </label>
+                    <button id="qr-upload-btn" class="btn btn-primary">Gửi ảnh</button>
+                    <input type="text" id="qr-code-input" class="form-control ms-2" placeholder="Hoặc dán mã QR tại đây..." style="max-width: 250px; display: inline-block;">
                 </div>
             </div>
         </div>
@@ -200,14 +206,12 @@ document.addEventListener('DOMContentLoaded', function() {
         qrCodeInput.value = '';
     });
 
-    // Submit QR Check-in/Check-out via AJAX
+    // Submit QR Check-in/Check-out via unified AJAX endpoint
     function submitQRCheckInOut(qrData) {
-        // Auto-detect: check if user has check-in today
-        // If yes, next scan is checkout; if no, it's check-in
-        fetch('/api/checkin/qr', {
+        fetch("{{ url_for('api_qr_checkin') }}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ qr_code: qrData })
+            body: JSON.stringify({ code: qrData })
         })
         .then(response => response.json())
         .then(data => {
@@ -230,6 +234,54 @@ document.addEventListener('DOMContentLoaded', function() {
             qrResultDiv.innerHTML = '<strong>✗ Lỗi kết nối:</strong> ' + error.message;
         });
     }
+
+    // --- Image upload handling for modal ---
+    function showModalStatus(html) {
+        qrResultDiv.style.display = 'block';
+        qrResultDiv.innerHTML = html;
+    }
+
+    async function uploadImageFile(file) {
+        if (!file) return;
+        // Stop camera scanning while uploading
+        stopScanning();
+
+        showModalStatus('<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Đang gửi ảnh...</div>');
+
+        const form = new FormData();
+        form.append('image', file);
+
+        try {
+            const resp = await fetch("{{ url_for('api_qr_checkin_image') }}", {
+                method: 'POST',
+                body: form
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                showModalStatus('<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ' + data.message + '</div>');
+                setTimeout(() => { qrScannerModal.hide(); location.reload(); }, 1500);
+            } else {
+                showModalStatus('<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ' + (data.message || 'Lỗi khi xử lý ảnh') + '</div>');
+            }
+        } catch (err) {
+            console.error(err);
+            showModalStatus('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i> Lỗi kết nối server!</div>');
+        }
+    }
+
+    const fileInput = document.getElementById('qr-file-input');
+    const uploadBtn = document.getElementById('qr-upload-btn');
+
+    fileInput.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) uploadImageFile(f);
+    });
+
+    uploadBtn.addEventListener('click', (e) => {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) { fileInput.click(); return; }
+        uploadImageFile(f);
+    });
 });
 </script>
 {% endblock %}

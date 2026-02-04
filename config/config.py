@@ -7,7 +7,7 @@ class Config:
 
     # Cấu hình DB
     DB_USER = os.environ.get("DB_USER", "root")
-    DB_PASSWORD = os.environ.get("DB_PASSWORD", "123456")
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "38632347tT@")
     DB_HOST = os.environ.get("DB_HOST", os.environ.get("DB_HOST_ENV", "localhost"))
     DB_PORT = int(os.environ.get("DB_PORT", "3306"))
     DB_NAME = os.environ.get("DB_NAME", os.environ.get("DB_DATABASE", "attendance_db"))

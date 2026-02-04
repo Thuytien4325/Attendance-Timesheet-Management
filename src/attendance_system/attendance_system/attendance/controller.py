@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 
 from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, send_file
+from PIL import Image
+from pyzbar.pyzbar import decode as pyzbar_decode
 
 from ..core.enums import Role
 from ..core.exceptions import ValidationError
@@ -435,3 +437,49 @@ def register(app: Flask, container: Container) -> None:
                 "success": False,
                 "message": "Lỗi hệ thống khi chấm công"
             }), 500
+
+    @app.route("/api/qr/checkin/image", methods=["POST"], endpoint="api_qr_checkin_image")
+    @login_required
+    def api_qr_checkin_image():
+        """API endpoint to accept an uploaded image, decode QR code, and perform check-in/out."""
+        try:
+            if 'image' not in request.files:
+                return jsonify({"success": False, "message": "Thiếu file ảnh"}), 400
+
+            file = request.files['image']
+            img = Image.open(file.stream).convert('RGB')
+            decoded = pyzbar_decode(img)
+
+            if not decoded:
+                return jsonify({"success": False, "message": "Không phát hiện mã QR trong ảnh"}), 400
+
+            scanned_code = decoded[0].data.decode('utf-8').strip()
+
+            # Verify QR code is valid
+            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            if scanned_code != token_data:
+                return jsonify({
+                    "success": False,
+                    "message": "Mã QR không hợp lệ hoặc hết hạn!"
+                }), 400
+
+            user_id = int(session["user_id"])
+            today = date.today()
+
+            attendance_record = container.attendance_service.get_today_record(user_id, today)
+
+            if attendance_record and attendance_record.check_in_time and not attendance_record.check_out_time:
+                try:
+                    container.attendance_service.check_out(user_id)
+                    return jsonify({"success": True, "action": "tan_ca", "message": "✓ Chấm công tan ca thành công!"}), 200
+                except ValidationError as e:
+                    return jsonify({"success": False, "message": str(e)}), 400
+            else:
+                try:
+                    container.attendance_service.check_in(user_id)
+                    return jsonify({"success": True, "action": "vao_ca", "message": "✓ Chấm công vào ca thành công!"}), 200
+                except ValidationError as e:
+                    return jsonify({"success": False, "message": str(e)}), 400
+
+        except Exception as e:
+            return jsonify({"success": False, "message": "Lỗi hệ thống khi chấm công"}), 500
