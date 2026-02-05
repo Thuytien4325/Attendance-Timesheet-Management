@@ -369,6 +369,36 @@ def register(app: Flask, container: Container) -> None:
         except Exception as e:
             return jsonify({"success": False, "message": str(e)}), 500
 
+    @app.route("/api/user/qr/image", endpoint="user_qr_image")
+    @login_required
+    def user_qr_image():
+        """Generate and return user's personal QR code image for attendance check-in"""
+        try:
+            user_id = int(session["user_id"])
+            # Generate QR code containing the office token (same token all employees use to check in)
+            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(token_data)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+            
+            return send_file(buf, mimetype='image/png')
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
+
     @app.route("/qr/scan", endpoint="qr_scan_page")
     @login_required
     def qr_scan_page():
@@ -483,3 +513,38 @@ def register(app: Flask, container: Container) -> None:
 
         except Exception as e:
             return jsonify({"success": False, "message": "Lỗi hệ thống khi chấm công"}), 500
+
+    @app.route("/me/qr/manage", endpoint="user_qr_manage")
+    @login_required
+    def user_qr_manage():
+        """Page for employee to manage their personal QR code"""
+        user_id = int(session["user_id"])
+        return render_template("me/qr_manage.html", user_id=user_id, active_page="user_qr_manage")
+
+    @app.route("/api/user/qr/manage/image", endpoint="user_qr_manage_image")
+    @login_required
+    def user_qr_manage_image():
+        """Generate and return user's personal QR code image based on user ID"""
+        try:
+            user_id = int(session["user_id"])
+            
+            # Generate QR code containing the user ID
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(str(user_id))
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+            
+            return send_file(buf, mimetype='image/png')
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500

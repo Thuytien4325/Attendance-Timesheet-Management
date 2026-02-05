@@ -28,7 +28,9 @@
                         <p style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 12px; font-weight: 500;">
                             <i class="fas fa-qrcode" style="color: #667eea; margin-right: 6px;"></i>Mã QR Của Tôi
                         </p>
-                        <div id="sidebar-qr-code" style="background: white; padding: 10px; border-radius: 8px; display: inline-block;"></div>
+                        <a href="{{ url_for('user_qr_manage') }}" style="text-decoration: none; display: inline-block;">
+                            <img id="sidebar-qr-code" src="{{ url_for('user_qr_manage_image') }}" alt="Mã QR cá nhân" style="width: 140px; height: 140px; background: white; padding: 6px; border-radius: 6px; cursor: pointer; transition: transform 0.2s; display: block;">
+                        </a>
                         <p style="color: rgba(255,255,255,0.6); font-size: 0.75rem; margin-top: 8px;">ID: <strong style="color: white;">{{ session.get('user_id') }}</strong></p>
                     </div>
                 </div>
@@ -126,27 +128,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script>
-    // Generate QR Code in Sidebar
-    document.addEventListener('DOMContentLoaded', function() {
-        const qrContainer = document.getElementById('sidebar-qr-code');
-        const userId = '{{ session.get("user_id") }}';
-        
-        if (qrContainer && userId) {
-            QRCode.toCanvas(document.getElementById('sidebar-qr-code'), userId, {
-                errorCorrectionLevel: 'H',
-                type: 'image/png',
-                quality: 0.92,
-                margin: 1,
-                width: 150,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            });
-        }
-    });
-    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -283,5 +283,14 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadImageFile(f);
     });
 });
+
+function downloadUserQR() {
+    const link = document.createElement('a');
+    link.href = "{{ url_for('user_qr_image') }}";
+    link.download = 'my-qr-code.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 </script>
 {% endblock %}

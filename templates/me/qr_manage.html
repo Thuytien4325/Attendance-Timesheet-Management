@@ -1,0 +1,160 @@
+{% extends "layouts/dashboard_base.html" %}
+
+{% block title %}Quản lý Mã QR cá nhân - Hệ thống Chấm Công{% endblock %}
+
+{% block content %}
+<div class="qr-user-container">
+    <div class="qr-user-card">
+        <div class="qr-user-header">
+            <h3 class="fw-bold" style="color: #2c3e50;">
+                <i class="fas fa-qrcode" style="color: #667eea; margin-right: 10px;"></i>
+                Quản Lý Mã QR Cá Nhân
+            </h3>
+            <p class="text-muted">Mã QR của bạn để chấm công và chia sẻ với đồng nghiệp</p>
+        </div>
+
+        <div class="qr-content">
+            <div class="qr-display-area">
+                <div class="qr-image-wrapper">
+                    <img id="qr-image" src="{{ url_for('user_qr_manage_image') }}" alt="Mã QR cá nhân" width="300" height="300" style="border: 3px solid #667eea; padding: 15px; border-radius: 10px;">
+                </div>
+            </div>
+
+            <div class="qr-info mt-4">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Thông tin Mã QR:</strong>
+                    <ul style="margin-bottom: 0; margin-top: 10px;">
+                        <li>Đây là mã QR riêng của bạn (ID: <strong>{{ user_id }}</strong>)</li>
+                        <li>Bạn có thể chia sẻ mã QR này để nhân viên khác quét và chấm công cho bạn</li>
+                        <li>Hoặc sử dụng để tự chấm công qua ứng dụng quét QR</li>
+                        <li>Mỗi nhân viên có một mã QR khác nhau</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="qr-actions mt-4">
+                <button type="button" class="btn btn-primary" onclick="printQR()">
+                    <i class="fas fa-print me-2"></i> In Mã QR
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="downloadQR()">
+                    <i class="fas fa-download me-2"></i> Tải Ảnh
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i> Quay Lại
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Preview -->
+    <div id="print-area" style="display: none;">
+        <div style="text-align: center; padding: 40px;">
+            <h2>Mã QR Cá Nhân Của Tôi</h2>
+            <p style="color: #666; margin-bottom: 30px;">Nhân viên ID: <strong>{{ user_id }}</strong></p>
+            <img id="print-qr" src="{{ url_for('user_qr_manage_image') }}" alt="Mã QR cá nhân" width="400" height="400" style="border: 3px solid #333; padding: 20px;">
+            <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                Chia sẻ mã QR này để đồng nghiệp quét chấm công cho bạn<br>
+                hoặc quét để tự động chấm công vào/ra
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function printQR() {
+    const printArea = document.getElementById('print-area');
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = printArea.innerHTML;
+    window.print();
+    document.body.innerHTML = originalContent;
+    
+    // Re-attach event listeners
+    document.querySelector('.btn-primary').onclick = printQR;
+    document.querySelector('.btn-secondary').onclick = downloadQR;
+}
+
+function downloadQR() {
+    const link = document.createElement('a');
+    link.href = "{{ url_for('user_qr_manage_image') }}";
+    link.download = 'my-qr-code-{{ user_id }}.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+
+<style>
+.qr-user-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.qr-user-card {
+    background: white;
+    border-radius: 15px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.qr-user-header {
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+
+.qr-display-area {
+    text-align: center;
+    padding: 30px;
+    background: linear-gradient(135deg, #f5f7ff 0%, #f0f3ff 100%);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.qr-image-wrapper {
+    display: inline-block;
+}
+
+.qr-image-wrapper img {
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.qr-image-wrapper img:hover {
+    transform: scale(1.05);
+}
+
+.qr-info {
+    background: #f0f7ff;
+    border-left: 4px solid #667eea;
+}
+
+.qr-info .alert {
+    margin-bottom: 0;
+    border-left: none;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.qr-actions .btn {
+    padding: 12px 25px;
+    font-weight: 600;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #print-area, #print-area * {
+        visibility: visible;
+    }
+}
+</style>
+{% endblock %}
