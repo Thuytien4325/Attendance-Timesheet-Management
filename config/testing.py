@@ -10,6 +10,9 @@ DB_CONFIG = {
     "database": os.getenv("DB_NAME", "attendance_db"),
 }
 
+# QR Code token for attendance check-in
+QR_TOKEN = os.getenv("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+
 DEBUG = False
 TESTING = True
 

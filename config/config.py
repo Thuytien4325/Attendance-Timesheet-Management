@@ -12,6 +12,9 @@ class Config:
     DB_PORT = int(os.environ.get("DB_PORT", "3306"))
     DB_NAME = os.environ.get("DB_NAME", os.environ.get("DB_DATABASE", "attendance_db"))
 
+    # QR Code token for attendance check-in
+    QR_TOKEN = os.environ.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+
     # Dev helpers
     AUTO_INIT_DB = bool(int(os.environ.get("AUTO_INIT_DB", "0")))
     AUTO_SEED_DB = bool(int(os.environ.get("AUTO_SEED_DB", "0")))

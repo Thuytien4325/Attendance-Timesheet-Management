@@ -346,7 +346,10 @@ def register(app: Flask, container: Container) -> None:
         try:
             # Use a secure token for the QR code
             # In production, you could use date-based token or database config
-            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            token_data = app.config.get("QR_TOKEN") or "OFFICE_CHECKIN_SYSTEM"
+            
+            if app.config.get("DEBUG"):
+                print(f"[QR Generate] Creating QR code with token: '{token_data}'")
             
             # Generate QR code
             qr = qrcode.QRCode(
@@ -376,7 +379,7 @@ def register(app: Flask, container: Container) -> None:
         try:
             user_id = int(session["user_id"])
             # Generate QR code containing the office token (same token all employees use to check in)
-            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
+            token_data = app.config.get("QR_TOKEN") or "OFFICE_CHECKIN_SYSTEM"
             
             # Generate QR code
             qr = qrcode.QRCode(
@@ -408,7 +411,9 @@ def register(app: Flask, container: Container) -> None:
     @app.route("/api/qr/checkin", methods=["POST"], endpoint="api_qr_checkin")
     @login_required
     def api_qr_checkin():
-        """API endpoint to handle QR code scanning for check-in/out"""
+        """API endpoint to handle QR code scanning for check-in/out.
+        Each employee uses their personal QR code (containing their user_id)
+        """
         try:
             data = request.get_json()
             scanned_code = data.get("code", "").strip()
@@ -419,15 +424,27 @@ def register(app: Flask, container: Container) -> None:
                     "message": "Mã QR không được để trống"
                 }), 400
 
-            # Verify QR code is valid
-            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
-            if scanned_code != token_data:
+            # Personal QR code must contain the current user's ID
+            user_id = int(session["user_id"])
+            current_user_id_str = str(user_id)
+            scanned_code_str = scanned_code.strip()
+            
+            # Debug logging
+            if app.config.get("DEBUG"):
+                print(f"[QR Debug] Scanned: '{scanned_code_str}' (len={len(scanned_code_str)})")
+                print(f"[QR Debug] Current user_id: {user_id}")
+                print(f"[QR Debug] Match: {scanned_code_str == current_user_id_str}")
+            
+            # Only accept personal QR matching current user
+            if scanned_code_str != current_user_id_str:
+                error_msg = "Mã QR không khớp! Vui lòng quét mã QR của chính bạn."
+                if app.config.get("DEBUG"):
+                    error_msg += f" [Scanned: '{scanned_code_str}' vs Your ID: '{current_user_id_str}']"
                 return jsonify({
                     "success": False,
-                    "message": "Mã QR không hợp lệ hoặc hết hạn!"
+                    "message": error_msg
                 }), 400
 
-            user_id = int(session["user_id"])
             today = date.today()
             
             # Check if user has already checked in today
@@ -485,15 +502,27 @@ def register(app: Flask, container: Container) -> None:
 
             scanned_code = decoded[0].data.decode('utf-8').strip()
 
-            # Verify QR code is valid
-            token_data = app.config.get("QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
-            if scanned_code != token_data:
+            # Personal QR code must contain the current user's ID
+            user_id = int(session["user_id"])
+            current_user_id_str = str(user_id)
+            scanned_code_str = scanned_code.strip()
+            
+            # Debug logging
+            if app.config.get("DEBUG"):
+                print(f"[QR Image Debug] Scanned: '{scanned_code_str}' (len={len(scanned_code_str)})")
+                print(f"[QR Image Debug] Current user_id: {user_id}")
+                print(f"[QR Image Debug] Match: {scanned_code_str == current_user_id_str}")
+            
+            # Only accept personal QR matching current user
+            if scanned_code_str != current_user_id_str:
+                error_msg = "Ma QR khong khop! Vui long quet ma QR cua chinh ban."
+                if app.config.get("DEBUG"):
+                    error_msg += f" [Scanned: '{scanned_code_str}' vs Your ID: '{current_user_id_str}']"
                 return jsonify({
                     "success": False,
-                    "message": "Mã QR không hợp lệ hoặc hết hạn!"
+                    "message": error_msg
                 }), 400
 
-            user_id = int(session["user_id"])
             today = date.today()
 
             attendance_record = container.attendance_service.get_today_record(user_id, today)

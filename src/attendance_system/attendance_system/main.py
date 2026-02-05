@@ -26,6 +26,7 @@ def create_app() -> Flask:
     app.secret_key = getattr(settings, "SECRET_KEY")
     db_config = getattr(settings, "DB_CONFIG")
     app.config["DEBUG"] = bool(getattr(settings, "DEBUG", False))
+    app.config["QR_TOKEN"] = getattr(settings, "QR_TOKEN", "OFFICE_CHECKIN_SYSTEM")
 
     # Helpful startup info to avoid "DBeaver connected but no tables" confusion.
     if app.config["DEBUG"]:
